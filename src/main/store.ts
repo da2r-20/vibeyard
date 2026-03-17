@@ -22,10 +22,15 @@ export interface ProjectRecord {
   };
 }
 
+export interface Preferences {
+  soundOnSessionWaiting: boolean;
+}
+
 export interface PersistedState {
   version: 1;
   projects: ProjectRecord[];
   activeProjectId: string | null;
+  preferences: Preferences;
 }
 
 const STATE_DIR = path.join(os.homedir(), '.claude-ide');
@@ -38,6 +43,7 @@ function defaultState(): PersistedState {
     version: 1,
     projects: [],
     activeProjectId: null,
+    preferences: { soundOnSessionWaiting: false },
   };
 }
 

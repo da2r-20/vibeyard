@@ -21,6 +21,7 @@ export function spawnPty(
 
   const env = { ...process.env };
   delete env.CLAUDE_CODE; // avoid subprocess detection conflicts
+  env.CLAUDE_IDE_SESSION_ID = sessionId;
 
   const args: string[] = [];
   if (claudeSessionId) {

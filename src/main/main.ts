@@ -4,6 +4,8 @@ import { registerIpcHandlers } from './ipc-handlers';
 import { killAllPtys } from './pty-manager';
 import { flushState } from './store';
 import { createAppMenu } from './menu';
+import { cleanupAll as cleanupHookStatus } from './hook-status';
+import { installHooks } from './claude-cli';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -31,6 +33,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  installHooks();
   registerIpcHandlers();
   createAppMenu();
   createWindow();
@@ -45,6 +48,7 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
   flushState();
   killAllPtys();
+  cleanupHookStatus();
 });
 
 app.on('window-all-closed', () => {

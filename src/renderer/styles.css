@@ -35,6 +35,10 @@ html, body {
   height: 100vh;
 }
 
+body.debug-panel-open #app {
+  height: calc(100vh - var(--debug-panel-height));
+}
+
 /* Sidebar */
 #sidebar {
   width: 200px;
@@ -943,11 +947,12 @@ html, body {
 
 /* Debug panel */
 #debug-panel {
+  --debug-panel-height: 300px;
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 300px;
+  height: var(--debug-panel-height);
   background: #0d0d1a;
   border-top: 2px solid var(--accent);
   z-index: 300;

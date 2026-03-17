@@ -221,6 +221,8 @@ export function installHooks(): void {
   const ideEvents: Record<string, string> = {
     SessionStart: 'waiting',
     UserPromptSubmit: 'working',
+    PostToolUse: 'working',
+    PostToolUseFailure: 'working',
     Stop: 'waiting',
     TaskCompleted: 'completed',
     PermissionRequest: 'permission',

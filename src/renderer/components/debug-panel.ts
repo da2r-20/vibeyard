@@ -1,3 +1,5 @@
+import { stripAnsi } from '../ansi';
+
 interface DebugEvent {
   timestamp: number;
   type: string;
@@ -12,6 +14,8 @@ let panel: HTMLElement | null = null;
 let logEl: HTMLElement | null = null;
 let autoScroll = true;
 let filterType = '';
+let countInterval: ReturnType<typeof setInterval> | null = null;
+let countBar: HTMLElement | null = null;
 
 const TYPE_COLORS: Record<string, string> = {
   'hookStatus': '#f4b400',
@@ -40,7 +44,7 @@ function shortSessionId(id: string): string {
 
 function formatData(data: unknown): string {
   if (data === undefined) return '';
-  if (typeof data === 'string') return data;
+  if (typeof data === 'string') return stripAnsi(data);
   try {
     return JSON.stringify(data, null, 2);
   } catch {
@@ -170,7 +174,7 @@ function createPanel(): HTMLElement {
   el.appendChild(header);
 
   // Event count
-  const countBar = document.createElement('div');
+  countBar = document.createElement('div');
   countBar.className = 'debug-count-bar';
   el.appendChild(countBar);
 
@@ -182,12 +186,6 @@ function createPanel(): HTMLElement {
   document.body.appendChild(el);
   logEl = log;
 
-  // Update count periodically
-  setInterval(() => {
-    const filtered = filterType ? events.filter(e => e.type === filterType) : events;
-    countBar.textContent = `${filtered.length} events${filterType ? ` (filtered: ${filterType})` : ''}`;
-  }, 500);
-
   return el;
 }
 
@@ -197,9 +195,23 @@ export function setDebugVisible(show: boolean): void {
   visible = show;
   if (visible) {
     panel.classList.remove('hidden');
+    document.body.classList.add('debug-panel-open');
     renderAllEvents();
+    if (!countInterval && countBar) {
+      const updateCount = () => {
+        const filtered = filterType ? events.filter(e => e.type === filterType) : events;
+        countBar!.textContent = `${filtered.length} events${filterType ? ` (filtered: ${filterType})` : ''}`;
+      };
+      updateCount();
+      countInterval = setInterval(updateCount, 500);
+    }
   } else {
     panel.classList.add('hidden');
+    document.body.classList.remove('debug-panel-open');
+    if (countInterval) {
+      clearInterval(countInterval);
+      countInterval = null;
+    }
   }
 }
 

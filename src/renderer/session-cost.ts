@@ -1,3 +1,5 @@
+import { stripAnsi } from './ansi';
+
 export interface CostInfo {
   totalCostUsd: number;
   totalInputTokens: number;
@@ -13,8 +15,7 @@ type CostChangeCallback = (sessionId: string, cost: CostInfo) => void;
 const costs = new Map<string, CostInfo>();
 const listeners: CostChangeCallback[] = [];
 
-// Strip ANSI escape codes and search for dollar cost patterns (fallback)
-const ANSI_RE = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?(?:\x07|\x1b\\)/g;
+// Search for dollar cost patterns (fallback)
 const COST_RE = /\$(\d+\.\d{2,})/g;
 
 export function setCostData(sessionId: string, rawData: { cost: Record<string, unknown>; context_window: Record<string, unknown> }): void {
@@ -47,7 +48,7 @@ export function parseCost(sessionId: string, rawData: string): void {
   // Don't overwrite structured data with regex fallback
   if (costs.has(sessionId) && costs.get(sessionId)!.totalInputTokens > 0) return;
 
-  const clean = rawData.replace(ANSI_RE, '');
+  const clean = stripAnsi(rawData);
   let match: RegExpExecArray | null;
   let lastCost: string | null = null;
 

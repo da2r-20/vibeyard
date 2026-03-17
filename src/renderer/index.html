@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude IDE</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="xterm.css">
+</head>
+<body>
+  <div id="app">
+    <div id="sidebar">
+      <div id="sidebar-header">
+        <span class="sidebar-title">Projects</span>
+        <button id="btn-add-project" class="icon-btn" title="New Project (Ctrl+Shift+P)">+</button>
+      </div>
+      <div id="project-list"></div>
+    </div>
+    <div id="main-area">
+      <div id="tab-bar">
+        <div id="tab-list"></div>
+        <div id="tab-actions">
+          <button id="btn-toggle-split" class="icon-btn" title="Toggle Split (Ctrl+\)">&#x2503;</button>
+          <button id="btn-add-session" class="icon-btn" title="New Session (Ctrl+Shift+N)">+</button>
+        </div>
+      </div>
+      <div id="terminal-container"></div>
+    </div>
+  </div>
+
+  <div id="modal-overlay" class="hidden">
+    <div id="modal">
+      <div id="modal-title"></div>
+      <div id="modal-body"></div>
+      <div id="modal-actions">
+        <button id="modal-cancel" class="modal-btn">Cancel</button>
+        <button id="modal-confirm" class="modal-btn primary">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="index.js"></script>
+</body>
+</html>

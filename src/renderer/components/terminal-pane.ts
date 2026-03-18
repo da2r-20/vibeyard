@@ -1,6 +1,7 @@
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
+import { SearchAddon } from '@xterm/addon-search';
 import { initSession, removeSession } from '../session-activity.js';
 import { removeSession as removeCostSession, type CostInfo } from '../session-cost.js';
 import { removeSession as removeContextSession, type ContextWindowInfo } from '../session-context.js';
@@ -8,6 +9,7 @@ import { removeSession as removeContextSession, type ContextWindowInfo } from '.
 interface TerminalInstance {
   terminal: Terminal;
   fitAddon: FitAddon;
+  searchAddon: SearchAddon;
   element: HTMLDivElement;
   sessionId: string;
   projectPath: string;
@@ -74,9 +76,21 @@ export function createTerminalPane(
   const fitAddon = new FitAddon();
   terminal.loadAddon(fitAddon);
 
+  const searchAddon = new SearchAddon();
+  terminal.loadAddon(searchAddon);
+
+  // Let Cmd+F bubble up to the document listener instead of being consumed by xterm
+  terminal.attachCustomKeyEventHandler((e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+      return false;
+    }
+    return true;
+  });
+
   const instance: TerminalInstance = {
     terminal,
     fitAddon,
+    searchAddon,
     element,
     sessionId,
     projectPath,
@@ -196,6 +210,14 @@ export function fitAllVisible(): void {
   }
 }
 
+export function getSearchAddon(sessionId: string): SearchAddon | undefined {
+  return instances.get(sessionId)?.searchAddon;
+}
+
+export function getFocusedSessionId(): string | null {
+  return focusedSessionId;
+}
+
 export function setFocused(sessionId: string): void {
   focusedSessionId = sessionId;
   for (const [id, instance] of instances) {
@@ -213,28 +235,6 @@ export function handlePtyData(sessionId: string, data: string): void {
   if (instance) {
     instance.terminal.write(data);
   }
-}
-
-export function handlePtyExit(sessionId: string, exitCode: number): void {
-  const instance = instances.get(sessionId);
-  if (!instance) return;
-
-  instance.exited = true;
-  instance.spawned = false;
-
-  const overlay = document.createElement('div');
-  overlay.className = 'terminal-exit-overlay';
-  overlay.innerHTML = `
-    <div class="terminal-exit-message">
-      <div>Session ended (exit code: ${exitCode})</div>
-      <button class="respawn-btn">Restart Session</button>
-    </div>
-  `;
-  overlay.querySelector('.respawn-btn')!.addEventListener('click', () => {
-    overlay.remove();
-    spawnTerminal(sessionId);
-  });
-  instance.element.appendChild(overlay);
 }
 
 export function destroyTerminal(sessionId: string): void {

@@ -4,6 +4,8 @@ import { promptNewSession } from './components/tab-bar.js';
 import { toggleProjectTerminal } from './components/project-terminal.js';
 import { toggleDebugPanel } from './components/debug-panel.js';
 import { showHelpDialog } from './components/help-dialog.js';
+import { getFocusedSessionId } from './components/terminal-pane.js';
+import { showSearchBar } from './components/search-bar.js';
 
 export function initKeybindings(): void {
   // Menu-based shortcuts (registered via Electron menu accelerators)
@@ -18,6 +20,14 @@ export function initKeybindings(): void {
   window.claudeIde.menu.onToggleDebug(() => toggleDebugPanel());
 
   document.addEventListener('keydown', (e) => {
+    // Cmd+F / Ctrl+F to open terminal search
+    if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+      const sessionId = getFocusedSessionId();
+      if (sessionId) {
+        e.preventDefault();
+        showSearchBar(sessionId);
+      }
+    }
     // Ctrl+` to toggle project terminal
     if ((e.ctrlKey || e.metaKey) && e.key === '`') {
       e.preventDefault();

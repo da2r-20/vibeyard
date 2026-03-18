@@ -3,7 +3,7 @@ import { initSidebar } from './components/sidebar.js';
 import { initTabBar } from './components/tab-bar.js';
 import { initSplitLayout } from './components/split-layout.js';
 import { initKeybindings } from './keybindings.js';
-import { handlePtyData, handlePtyExit, updateCostDisplay, updateContextDisplay } from './components/terminal-pane.js';
+import { handlePtyData, destroyTerminal, updateCostDisplay, updateContextDisplay } from './components/terminal-pane.js';
 import { setIdle, setHookStatus } from './session-activity.js';
 import { parseCost, setCostData, onChange as onCostChange } from './session-cost.js';
 import { setContextData, onChange as onContextChange } from './session-context.js';
@@ -58,8 +58,12 @@ async function main(): Promise<void> {
     if (isShellSessionId(sessionId)) {
       handleShellPtyExit(sessionId, exitCode);
     } else {
-      handlePtyExit(sessionId, exitCode);
-      setIdle(sessionId);
+      // Auto-close the session when CLI exits
+      const project = appState.projects.find(p => p.sessions.some(s => s.id === sessionId));
+      if (project) {
+        destroyTerminal(sessionId);
+        appState.removeSession(project.id, sessionId);
+      }
     }
   });
 

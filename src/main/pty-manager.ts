@@ -1,4 +1,8 @@
 import * as pty from 'node-pty';
+import { execSync } from 'child_process';
+import * as os from 'os';
+import * as path from 'path';
+import * as fs from 'fs';
 
 interface PtyInstance {
   process: pty.IPty;
@@ -6,6 +10,72 @@ interface PtyInstance {
 }
 
 const ptys = new Map<string, PtyInstance>();
+
+/**
+ * Get a full PATH that includes common binary directories.
+ * When Electron is launched from macOS (e.g. via DMG), process.env.PATH
+ * is minimal and won't include dirs like /usr/local/bin or /opt/homebrew/bin.
+ */
+function getFullPath(): string {
+  const currentPath = process.env.PATH || '';
+  const home = os.homedir();
+  const extraDirs = [
+    '/usr/local/bin',
+    '/opt/homebrew/bin',
+    path.join(home, '.local', 'bin'),
+    path.join(home, '.npm-global', 'bin'),
+    '/usr/local/sbin',
+    '/opt/homebrew/sbin',
+  ];
+
+  const pathSet = new Set(currentPath.split(':'));
+  for (const dir of extraDirs) {
+    pathSet.add(dir);
+  }
+  return Array.from(pathSet).join(':');
+}
+
+/**
+ * Resolve the full path to the `claude` binary.
+ * Falls back to bare 'claude' if resolution fails.
+ */
+function resolveClaudePath(): string {
+  const fullPath = getFullPath();
+
+  // Check common locations directly
+  const candidates = [
+    '/usr/local/bin/claude',
+    '/opt/homebrew/bin/claude',
+    path.join(os.homedir(), '.local', 'bin', 'claude'),
+    path.join(os.homedir(), '.npm-global', 'bin', 'claude'),
+  ];
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) return candidate;
+    } catch {}
+  }
+
+  // Try `which` with augmented PATH
+  try {
+    const resolved = execSync('which claude', {
+      env: { ...process.env, PATH: fullPath },
+      encoding: 'utf-8',
+      timeout: 3000,
+    }).trim();
+    if (resolved) return resolved;
+  } catch {}
+
+  return 'claude';
+}
+
+let cachedClaudePath: string | null = null;
+
+function getClaudeBinary(): string {
+  if (!cachedClaudePath) {
+    cachedClaudePath = resolveClaudePath();
+  }
+  return cachedClaudePath;
+}
 
 export function spawnPty(
   sessionId: string,
@@ -24,6 +94,7 @@ export function spawnPty(
   delete env.CLAUDE_CODE; // avoid subprocess detection conflicts
   env.CLAUDE_IDE_SESSION_ID = sessionId;
   env.CLAUDE_CODE_STATUSLINE = '/tmp/ccide/statusline.sh';
+  env.PATH = getFullPath();
 
   const args: string[] = [];
   if (claudeSessionId) {
@@ -38,7 +109,7 @@ export function spawnPty(
     args.push(...extraArgs.split(/\s+/).filter(Boolean));
   }
 
-  const shell = 'claude';
+  const shell = getClaudeBinary();
   const ptyProcess = pty.spawn(shell, args, {
     name: 'xterm-256color',
     cols: 120,
@@ -89,12 +160,13 @@ export function spawnShellPty(
   }
 
   const shell = process.env.SHELL || '/bin/zsh';
+  const shellEnv = { ...process.env, PATH: getFullPath() };
   const ptyProcess = pty.spawn(shell, [], {
     name: 'xterm-256color',
     cols: 120,
     rows: 15,
     cwd,
-    env: { ...process.env },
+    env: shellEnv,
   });
 
   ptyProcess.onData((data) => onData(data));

@@ -5,7 +5,8 @@ import { homedir } from 'os';
 export interface McpServer { name: string; url: string; status: string; scope: 'user' | 'project' }
 export interface Agent { name: string; model: string; category: 'plugin' | 'built-in'; scope: 'user' | 'project' }
 export interface Skill { name: string; description: string; scope: 'user' | 'project' }
-export interface ClaudeConfig { mcpServers: McpServer[]; agents: Agent[]; skills: Skill[] }
+export interface Command { name: string; description: string; scope: 'user' | 'project' }
+export interface ClaudeConfig { mcpServers: McpServer[]; agents: Agent[]; skills: Skill[]; commands: Command[] }
 
 function readJsonSafe(filePath: string): Record<string, unknown> | null {
   try {
@@ -138,6 +139,18 @@ function readPluginSkills(): Skill[] {
     }
   }
   return skills;
+}
+
+/** Read commands from .md files in a commands directory */
+function readCommandsFromDir(dirPath: string, scope: 'user' | 'project'): Command[] {
+  const commands: Command[] = [];
+  for (const file of readDirSafe(dirPath)) {
+    if (!file.endsWith('.md')) continue;
+    const name = file.slice(0, -3);
+    const fm = parseFrontmatter(path.join(dirPath, file));
+    commands.push({ name, description: fm.description || '', scope });
+  }
+  return commands;
 }
 
 /** Read skills from a directory (user or project scope) */
@@ -361,5 +374,21 @@ export async function getClaudeConfig(projectPath: string): Promise<ClaudeConfig
     }
   }
 
-  return { mcpServers, agents, skills };
+  // Commands
+  const userCommands = readCommandsFromDir(path.join(claudeDir, 'commands'), 'user');
+  const projectCommands = readCommandsFromDir(path.join(projectPath, '.claude', 'commands'), 'project');
+
+  const commandNames = new Set<string>();
+  const commands: Command[] = [];
+  // Project commands override user commands
+  for (const list of [projectCommands, userCommands]) {
+    for (const c of list) {
+      if (!commandNames.has(c.name)) {
+        commandNames.add(c.name);
+        commands.push(c);
+      }
+    }
+  }
+
+  return { mcpServers, agents, skills, commands };
 }

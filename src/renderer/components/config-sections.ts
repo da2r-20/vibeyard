@@ -1,5 +1,5 @@
 import { appState } from '../state.js';
-import type { ClaudeConfig, McpServer, Agent, Skill } from '../types.js';
+import type { ClaudeConfig, McpServer, Agent, Skill, Command } from '../types.js';
 
 const collapsed: Record<string, boolean> = {};
 
@@ -62,6 +62,13 @@ function skillItem(skill: Skill): HTMLElement {
   return el;
 }
 
+function commandItem(cmd: Command): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'config-item';
+  el.innerHTML = `<span class="config-item-name">/${esc(cmd.name)}</span><span class="config-item-detail">${esc(cmd.description)}</span>${scopeBadge(cmd.scope)}`;
+  return el;
+}
+
 function esc(s: string): string {
   const d = document.createElement('div');
   d.textContent = s;
@@ -109,6 +116,13 @@ async function refresh(): Promise<void> {
     'Skills',
     config.skills.map(skillItem),
     config.skills.length,
+  ));
+
+  container.appendChild(renderSection(
+    'commands',
+    'Commands',
+    config.commands.map(commandItem),
+    config.commands.length,
   ));
 }
 

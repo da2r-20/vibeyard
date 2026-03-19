@@ -30,7 +30,7 @@ beforeEach(() => {
 describe('getClaudeConfig', () => {
   it('returns empty config when no files exist', async () => {
     const config = await getClaudeConfig('/project');
-    expect(config).toEqual({ mcpServers: [], agents: [], skills: [] });
+    expect(config).toEqual({ mcpServers: [], agents: [], skills: [], commands: [] });
   });
 
   it('reads MCP servers from user settings.json', async () => {
@@ -121,6 +121,78 @@ describe('getClaudeConfig', () => {
 
     const config = await getClaudeConfig('/project');
     expect(config.agents).toHaveLength(1);
+  });
+
+  it('reads commands from user commands directory', async () => {
+    mockReaddirSync.mockImplementation((dirPath) => {
+      if (String(dirPath) === '/mock/home/.claude/commands') {
+        return ['commit.md', 'review.md'] as unknown as fs.Dirent[];
+      }
+      throw new Error('ENOENT');
+    });
+    mockReadFileSync.mockImplementation((filePath) => {
+      if (String(filePath) === '/mock/home/.claude/commands/commit.md') {
+        return '---\ndescription: Create a commit\n---\nContent';
+      }
+      if (String(filePath) === '/mock/home/.claude/commands/review.md') {
+        return 'No frontmatter here';
+      }
+      throw new Error('ENOENT');
+    });
+
+    const config = await getClaudeConfig('/project');
+    expect(config.commands).toEqual([
+      { name: 'commit', description: 'Create a commit', scope: 'user' },
+      { name: 'review', description: '', scope: 'user' },
+    ]);
+  });
+
+  it('reads commands from project commands directory', async () => {
+    mockReaddirSync.mockImplementation((dirPath) => {
+      if (String(dirPath) === '/project/.claude/commands') {
+        return ['deploy.md'] as unknown as fs.Dirent[];
+      }
+      throw new Error('ENOENT');
+    });
+    mockReadFileSync.mockImplementation((filePath) => {
+      if (String(filePath) === '/project/.claude/commands/deploy.md') {
+        return '---\ndescription: Deploy the app\n---\n';
+      }
+      throw new Error('ENOENT');
+    });
+
+    const config = await getClaudeConfig('/project');
+    expect(config.commands).toEqual([
+      { name: 'deploy', description: 'Deploy the app', scope: 'project' },
+    ]);
+  });
+
+  it('deduplicates commands by name (project overrides user)', async () => {
+    mockReaddirSync.mockImplementation((dirPath) => {
+      const p = String(dirPath);
+      if (p === '/mock/home/.claude/commands') {
+        return ['shared.md'] as unknown as fs.Dirent[];
+      }
+      if (p === '/project/.claude/commands') {
+        return ['shared.md'] as unknown as fs.Dirent[];
+      }
+      throw new Error('ENOENT');
+    });
+    mockReadFileSync.mockImplementation((filePath) => {
+      const p = String(filePath);
+      if (p === '/mock/home/.claude/commands/shared.md') {
+        return '---\ndescription: User version\n---\n';
+      }
+      if (p === '/project/.claude/commands/shared.md') {
+        return '---\ndescription: Project version\n---\n';
+      }
+      throw new Error('ENOENT');
+    });
+
+    const config = await getClaudeConfig('/project');
+    expect(config.commands).toHaveLength(1);
+    expect(config.commands[0].description).toBe('Project version');
+    expect(config.commands[0].scope).toBe('project');
   });
 
   it('reads skills from directories', async () => {

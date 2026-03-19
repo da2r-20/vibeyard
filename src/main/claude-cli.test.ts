@@ -45,7 +45,7 @@ describe('getClaudeConfig', () => {
 
     const config = await getClaudeConfig('/project');
     expect(config.mcpServers).toEqual([
-      { name: 'myServer', url: 'http://localhost:3000', status: 'configured', scope: 'user' },
+      { name: 'myServer', url: 'http://localhost:3000', status: 'configured', scope: 'user', filePath: '/mock/home/.claude/settings.json' },
     ]);
   });
 
@@ -61,7 +61,7 @@ describe('getClaudeConfig', () => {
 
     const config = await getClaudeConfig('/project');
     expect(config.mcpServers).toEqual([
-      { name: 'projServer', url: 'npx server', status: 'configured', scope: 'project' },
+      { name: 'projServer', url: 'npx server', status: 'configured', scope: 'project', filePath: '/project/.mcp.json' },
     ]);
   });
 
@@ -99,7 +99,7 @@ describe('getClaudeConfig', () => {
 
     const config = await getClaudeConfig('/project');
     expect(config.agents).toEqual([
-      { name: 'MyAgent', model: 'opus', category: 'plugin', scope: 'user' },
+      { name: 'MyAgent', model: 'opus', category: 'plugin', scope: 'user', filePath: '/mock/home/.claude/agents/my-agent.md' },
     ]);
   });
 
@@ -142,8 +142,8 @@ describe('getClaudeConfig', () => {
 
     const config = await getClaudeConfig('/project');
     expect(config.commands).toEqual([
-      { name: 'commit', description: 'Create a commit', scope: 'user' },
-      { name: 'review', description: '', scope: 'user' },
+      { name: 'commit', description: 'Create a commit', scope: 'user', filePath: '/mock/home/.claude/commands/commit.md' },
+      { name: 'review', description: '', scope: 'user', filePath: '/mock/home/.claude/commands/review.md' },
     ]);
   });
 
@@ -163,7 +163,7 @@ describe('getClaudeConfig', () => {
 
     const config = await getClaudeConfig('/project');
     expect(config.commands).toEqual([
-      { name: 'deploy', description: 'Deploy the app', scope: 'project' },
+      { name: 'deploy', description: 'Deploy the app', scope: 'project', filePath: '/project/.claude/commands/deploy.md' },
     ]);
   });
 
@@ -211,7 +211,7 @@ describe('getClaudeConfig', () => {
 
     const config = await getClaudeConfig('/project');
     expect(config.skills).toEqual([
-      { name: 'MySkill', description: 'Does stuff', scope: 'user' },
+      { name: 'MySkill', description: 'Does stuff', scope: 'user', filePath: '/mock/home/.claude/skills/my-skill/SKILL.md' },
     ]);
   });
 });

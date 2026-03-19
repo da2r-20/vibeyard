@@ -414,4 +414,10 @@ class AppState {
   }
 }
 
+/** @internal Test-only: reset all module state */
+export function _resetForTesting(): void {
+  (appState as any)['state'] = { version: 1, projects: [], activeProjectId: null, preferences: { soundOnSessionWaiting: false, debugMode: false } };
+  (appState as any)['listeners'] = new Map();
+}
+
 export const appState = new AppState();

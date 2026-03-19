@@ -195,6 +195,130 @@ describe('getClaudeConfig', () => {
     expect(config.commands[0].scope).toBe('project');
   });
 
+  it('reads MCP servers from ~/.claude.json top-level (user scope)', async () => {
+    mockReadFileSync.mockImplementation((filePath) => {
+      if (String(filePath) === '/mock/home/.claude.json') {
+        return JSON.stringify({
+          mcpServers: { globalServer: { url: 'http://global:3000' } },
+        });
+      }
+      throw new Error('ENOENT');
+    });
+
+    const config = await getClaudeConfig('/project');
+    expect(config.mcpServers).toContainEqual(
+      expect.objectContaining({ name: 'globalServer', url: 'http://global:3000', scope: 'user' })
+    );
+  });
+
+  it('reads project-specific MCP servers from ~/.claude.json projects key', async () => {
+    mockReadFileSync.mockImplementation((filePath) => {
+      if (String(filePath) === '/mock/home/.claude.json') {
+        return JSON.stringify({
+          projects: {
+            '/project': {
+              mcpServers: { localServer: { command: 'npx local' } },
+            },
+          },
+        });
+      }
+      throw new Error('ENOENT');
+    });
+
+    const config = await getClaudeConfig('/project');
+    expect(config.mcpServers).toContainEqual(
+      expect.objectContaining({ name: 'localServer', url: 'npx local', scope: 'project' })
+    );
+  });
+
+  it('reads managed MCP servers from platform-specific path', async () => {
+    mockReadFileSync.mockImplementation((filePath) => {
+      // On macOS (test environment), the path is /Library/Application Support/ClaudeCode/managed-mcp.json
+      if (String(filePath).includes('managed-mcp.json')) {
+        return JSON.stringify({
+          mcpServers: { managedServer: { url: 'http://managed:3000' } },
+        });
+      }
+      throw new Error('ENOENT');
+    });
+
+    const config = await getClaudeConfig('/project');
+    expect(config.mcpServers).toContainEqual(
+      expect.objectContaining({ name: 'managedServer', url: 'http://managed:3000', scope: 'user' })
+    );
+  });
+
+  it('reads plugin agents when enabled', async () => {
+    mockReadFileSync.mockImplementation((filePath) => {
+      const p = String(filePath);
+      if (p === '/mock/home/.claude/settings.json') {
+        return JSON.stringify({ enabledPlugins: { 'my-plugin': true } });
+      }
+      if (p === '/mock/home/.claude/plugins/installed_plugins.json') {
+        return JSON.stringify({
+          plugins: {
+            'my-plugin': [{ installPath: '/mock/plugins/my-plugin', scope: 'user' }],
+          },
+        });
+      }
+      if (p === '/mock/plugins/my-plugin/agents/agent.md') {
+        return '---\nname: PluginAgent\nmodel: sonnet\n---\n';
+      }
+      throw new Error('ENOENT');
+    });
+    mockReaddirSync.mockImplementation((dirPath) => {
+      if (String(dirPath) === '/mock/plugins/my-plugin/agents') {
+        return ['agent.md'] as unknown as fs.Dirent[];
+      }
+      throw new Error('ENOENT');
+    });
+
+    const config = await getClaudeConfig('/project');
+    expect(config.agents).toContainEqual(
+      expect.objectContaining({ name: 'PluginAgent', category: 'plugin', scope: 'user' })
+    );
+  });
+
+  it('skips disabled plugins', async () => {
+    mockReadFileSync.mockImplementation((filePath) => {
+      const p = String(filePath);
+      if (p === '/mock/home/.claude/settings.json') {
+        return JSON.stringify({ enabledPlugins: { 'my-plugin': false } });
+      }
+      if (p === '/mock/home/.claude/plugins/installed_plugins.json') {
+        return JSON.stringify({
+          plugins: {
+            'my-plugin': [{ installPath: '/mock/plugins/my-plugin' }],
+          },
+        });
+      }
+      throw new Error('ENOENT');
+    });
+
+    const config = await getClaudeConfig('/project');
+    expect(config.agents).toEqual([]);
+  });
+
+  it('returns empty plugins when enabledPlugins is missing', async () => {
+    mockReadFileSync.mockImplementation((filePath) => {
+      const p = String(filePath);
+      if (p === '/mock/home/.claude/settings.json') {
+        return JSON.stringify({});
+      }
+      if (p === '/mock/home/.claude/plugins/installed_plugins.json') {
+        return JSON.stringify({
+          plugins: {
+            'my-plugin': [{ installPath: '/mock/plugins/my-plugin' }],
+          },
+        });
+      }
+      throw new Error('ENOENT');
+    });
+
+    const config = await getClaudeConfig('/project');
+    expect(config.agents).toEqual([]);
+  });
+
   it('reads skills from directories', async () => {
     mockReaddirSync.mockImplementation((dirPath) => {
       if (String(dirPath) === '/mock/home/.claude/skills') {

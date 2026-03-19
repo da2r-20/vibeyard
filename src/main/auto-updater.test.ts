@@ -62,6 +62,27 @@ describe('auto-updater', () => {
     expect(mockSend).toHaveBeenCalledWith('update:available', { version: '1.2.3' });
   });
 
+  it('forwards download-progress event to renderer', () => {
+    initAutoUpdater();
+    const handler = vi.mocked(autoUpdater.on).mock.calls.find((c) => c[0] === 'download-progress')![1] as (progress: { percent: number }) => void;
+    handler({ percent: 55.7 });
+    expect(mockSend).toHaveBeenCalledWith('update:download-progress', { percent: 56 });
+  });
+
+  it('forwards update-downloaded event to renderer', () => {
+    initAutoUpdater();
+    const handler = vi.mocked(autoUpdater.on).mock.calls.find((c) => c[0] === 'update-downloaded')![1] as (info: { version: string }) => void;
+    handler({ version: '2.0.0' });
+    expect(mockSend).toHaveBeenCalledWith('update:downloaded', { version: '2.0.0' });
+  });
+
+  it('forwards error event to renderer', () => {
+    initAutoUpdater();
+    const handler = vi.mocked(autoUpdater.on).mock.calls.find((c) => c[0] === 'error')![1] as (err: Error) => void;
+    handler(new Error('update failed'));
+    expect(mockSend).toHaveBeenCalledWith('update:error', { message: 'update failed' });
+  });
+
   it('skips initialization in dev mode', async () => {
     vi.resetModules();
     vi.doMock('electron', () => ({

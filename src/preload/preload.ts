@@ -33,6 +33,8 @@ export interface ClaudeIdeApi {
   fs: {
     isDirectory(path: string): Promise<boolean>;
     browseDirectory(): Promise<string | null>;
+    listFiles(cwd: string, query: string): Promise<string[]>;
+    readFile(filePath: string): Promise<string>;
   };
   store: {
     load(): Promise<unknown>;
@@ -109,6 +111,8 @@ const api: ClaudeIdeApi = {
   fs: {
     isDirectory: (path) => ipcRenderer.invoke('fs:isDirectory', path),
     browseDirectory: () => ipcRenderer.invoke('fs:browseDirectory'),
+    listFiles: (cwd: string, query: string) => ipcRenderer.invoke('fs:listFiles', cwd, query),
+    readFile: (filePath: string) => ipcRenderer.invoke('fs:readFile', filePath),
   },
   claude: {
     getConfig: (projectPath) => ipcRenderer.invoke('claude:getConfig', projectPath),

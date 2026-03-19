@@ -27,6 +27,14 @@ import {
   attachFileViewerToContainer,
   getFileViewerInstance,
 } from './file-viewer.js';
+import {
+  createFileReaderPane,
+  destroyFileReaderPane,
+  showFileReaderPane,
+  hideAllFileReaderPanes,
+  attachFileReaderToContainer,
+  getFileReaderInstance,
+} from './file-reader.js';
 
 const container = document.getElementById('terminal-container')!;
 
@@ -45,11 +53,14 @@ export function initSplitLayout(): void {
 }
 
 function onSessionAdded(data: unknown): void {
-  const { session } = data as { projectId: string; session: { id: string; type?: string; claudeSessionId: string | null; args?: string; diffFilePath?: string; diffArea?: string } };
+  const { session } = data as { projectId: string; session: { id: string; type?: string; claudeSessionId: string | null; args?: string; diffFilePath?: string; diffArea?: string; fileReaderPath?: string } };
   const project = appState.activeProject;
   if (!project) return;
 
-  if (session.type === 'diff-viewer') {
+  if (session.type === 'file-reader') {
+    createFileReaderPane(session.id, session.fileReaderPath || '');
+    renderLayout();
+  } else if (session.type === 'diff-viewer') {
     createFileViewerPane(session.id, session.diffFilePath || '', session.diffArea || '');
     renderLayout();
   } else if (session.type === 'mcp-inspector') {
@@ -70,7 +81,9 @@ function onSessionAdded(data: unknown): void {
 
 function onSessionRemoved(data: unknown): void {
   const { sessionId } = data as { projectId: string; sessionId: string };
-  if (getFileViewerInstance(sessionId)) {
+  if (getFileReaderInstance(sessionId)) {
+    destroyFileReaderPane(sessionId);
+  } else if (getFileViewerInstance(sessionId)) {
     destroyFileViewerPane(sessionId);
   } else if (getInspectorInstance(sessionId)) {
     disconnectInspector(sessionId);
@@ -95,7 +108,11 @@ export function renderLayout(): void {
 
   // Ensure all sessions have their respective instances
   for (const session of project.sessions) {
-    if (session.type === 'diff-viewer') {
+    if (session.type === 'file-reader') {
+      if (!getFileReaderInstance(session.id)) {
+        createFileReaderPane(session.id, session.fileReaderPath || '');
+      }
+    } else if (session.type === 'diff-viewer') {
       if (!getFileViewerInstance(session.id)) {
         createFileViewerPane(session.id, session.diffFilePath || '', session.diffArea || '');
       }
@@ -113,6 +130,7 @@ export function renderLayout(): void {
   hideAllPanes();
   hideAllInspectorPanes();
   hideAllFileViewerPanes();
+  hideAllFileReaderPanes();
 
   if (project.layout.mode === 'split' && project.layout.splitPanes.length > 1) {
     renderSplitMode(project);
@@ -130,6 +148,11 @@ function renderTabMode(project: ProjectRecord): void {
   if (!activeId) return;
 
   const activeSession = project.sessions.find(s => s.id === activeId);
+  if (activeSession?.type === 'file-reader') {
+    attachFileReaderToContainer(activeId, container);
+    showFileReaderPane(activeId, false);
+    return;
+  }
   if (activeSession?.type === 'diff-viewer') {
     attachFileViewerToContainer(activeId, container);
     showFileViewerPane(activeId, false);
@@ -160,6 +183,11 @@ function renderSplitMode(project: ProjectRecord): void {
 
   for (const paneId of project.layout.splitPanes) {
     const session = project.sessions.find(s => s.id === paneId);
+    if (session?.type === 'file-reader') {
+      attachFileReaderToContainer(paneId, container);
+      showFileReaderPane(paneId, true);
+      continue;
+    }
     if (session?.type === 'diff-viewer') {
       attachFileViewerToContainer(paneId, container);
       showFileViewerPane(paneId, true);

@@ -45,6 +45,12 @@ export interface ClaudeIdeApi {
     onClaudeSessionId(callback: (sessionId: string, claudeSessionId: string) => void): () => void;
     onCostData(callback: (sessionId: string, costData: CostData) => void): () => void;
   };
+  fs: {
+    isDirectory(path: string): Promise<boolean>;
+    browseDirectory(): Promise<string | null>;
+    listFiles(cwd: string, query: string): Promise<string[]>;
+    readFile(filePath: string): Promise<string>;
+  };
   store: {
     load(): Promise<unknown>;
     save(state: unknown): Promise<void>;

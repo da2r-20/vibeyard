@@ -34,6 +34,7 @@ export const SHORTCUT_DEFAULTS: ShortcutDefault[] = [
   { id: 'project-terminal', label: 'Project Terminal', category: 'Panels', defaultKeys: 'Ctrl+`' },
   { id: 'debug-panel', label: 'Debug Panel', category: 'Panels', defaultKeys: 'CmdOrCtrl+Shift+D' },
   { id: 'git-panel', label: 'Git Panel', category: 'Panels', defaultKeys: 'CmdOrCtrl+Shift+G' },
+  { id: 'quick-open', label: 'Quick Open File', category: 'Search & Help', defaultKeys: 'CmdOrCtrl+P' },
   { id: 'find-in-terminal', label: 'Find in Terminal', category: 'Search & Help', defaultKeys: 'CmdOrCtrl+F' },
   { id: 'help', label: 'Help', category: 'Search & Help', defaultKeys: 'F1' },
 ];

@@ -9,12 +9,13 @@ declare global {
 export interface SessionRecord {
   id: string;
   name: string;
-  type?: 'claude' | 'mcp-inspector' | 'diff-viewer';
+  type?: 'claude' | 'mcp-inspector' | 'diff-viewer' | 'file-reader';
   args?: string;
   claudeSessionId: string | null;
   mcpServerUrl?: string;
   diffFilePath?: string;
   diffArea?: string;
+  fileReaderPath?: string;
   createdAt: string;
 }
 
@@ -219,6 +220,38 @@ class AppState {
       type: 'diff-viewer',
       diffFilePath: filePath,
       diffArea: area,
+      claudeSessionId: null,
+      createdAt: new Date().toISOString(),
+    };
+    project.sessions.push(session);
+    project.activeSessionId = session.id;
+    this.persist();
+    this.emit('session-added', { projectId, session });
+    this.emit('session-changed');
+    return session;
+  }
+
+  addFileReaderSession(projectId: string, filePath: string): SessionRecord | undefined {
+    const project = this.state.projects.find((p) => p.id === projectId);
+    if (!project) return undefined;
+
+    // If a file-reader tab for this path already exists, just switch to it
+    const existing = project.sessions.find(
+      (s) => s.type === 'file-reader' && s.fileReaderPath === filePath
+    );
+    if (existing) {
+      project.activeSessionId = existing.id;
+      this.persist();
+      this.emit('session-changed');
+      return existing;
+    }
+
+    const name = filePath.split('/').pop() || filePath;
+    const session: SessionRecord = {
+      id: crypto.randomUUID(),
+      name,
+      type: 'file-reader',
+      fileReaderPath: filePath,
       claudeSessionId: null,
       createdAt: new Date().toISOString(),
     };

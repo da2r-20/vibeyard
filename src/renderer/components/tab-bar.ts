@@ -241,16 +241,17 @@ function render(): void {
     const isUnread = !isActive && unreadSessions.has(session.id);
     const isMcp = session.type === 'mcp-inspector';
     const isDiff = session.type === 'diff-viewer';
-    const isSpecial = isMcp || isDiff;
+    const isFileReader = session.type === 'file-reader';
+    const isSpecial = isMcp || isDiff || isFileReader;
     tab.className = 'tab-item' + (isActive ? ' active' : '') + (isUnread ? ' unread' : '');
     tab.dataset.sessionId = session.id;
-    tab.title = isDiff ? `Diff: ${session.diffFilePath || session.name}` : isMcp ? `MCP Inspector` : buildTooltip(getStatus(session.id), session.claudeSessionId);
+    tab.title = isDiff ? `Diff: ${session.diffFilePath || session.name}` : isMcp ? `MCP Inspector` : isFileReader ? `File: ${session.fileReaderPath || session.name}` : buildTooltip(getStatus(session.id), session.claudeSessionId);
     const costInfo = isSpecial ? null : getCost(session.id);
     const costLabel = costInfo ? `$${costInfo.totalCostUsd.toFixed(2)}` : '';
-    const namePrefix = isDiff ? '<span class="tab-diff-badge">DIFF</span> ' : isMcp ? '<span class="tab-mcp-badge">MCP</span> ' : '';
-    const statusClass = isSpecial ? (isDiff ? 'diff' : 'mcp') : getStatus(session.id);
+    const namePrefix = isDiff ? '<span class="tab-diff-badge">DIFF</span> ' : isMcp ? '<span class="tab-mcp-badge">MCP</span> ' : isFileReader ? '<span class="tab-file-badge">FILE</span> ' : '';
+    const statusDot = isSpecial ? '' : `<span class="tab-status ${getStatus(session.id)}"></span>`;
     tab.innerHTML = `
-      <span class="tab-status ${statusClass}"></span>
+      ${statusDot}
       <span class="tab-name">${namePrefix}${esc(session.name)}</span>
       <span class="tab-cost">${costLabel}</span>
       <span class="tab-close" title="Close session">&times;</span>

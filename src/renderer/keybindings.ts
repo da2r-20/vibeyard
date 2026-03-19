@@ -7,6 +7,7 @@ import { showHelpDialog } from './components/help-dialog.js';
 import { getFocusedSessionId } from './components/terminal-pane.js';
 import { showSearchBar } from './components/search-bar.js';
 import { toggleGitPanel } from './components/git-panel.js';
+import { showQuickOpen } from './components/quick-open.js';
 import { shortcutManager } from './shortcuts.js';
 
 export function initKeybindings(): void {
@@ -33,6 +34,7 @@ export function initKeybindings(): void {
   shortcutManager.registerHandler('project-terminal', () => toggleProjectTerminal());
   shortcutManager.registerHandler('debug-panel', () => toggleDebugPanel());
   shortcutManager.registerHandler('git-panel', () => toggleGitPanel());
+  shortcutManager.registerHandler('quick-open', () => showQuickOpen());
   shortcutManager.registerHandler('find-in-terminal', () => {
     const sessionId = getFocusedSessionId();
     if (sessionId) showSearchBar(sessionId);

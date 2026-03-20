@@ -4,3 +4,23 @@ dist/
 
 *.tsbuildinfo
 coverage/
+
+# Environment files
+.env
+.env.*
+
+# IDE metadata
+.idea/
+.vscode/
+
+# Electron-builder output
+out/
+
+# Built distributables
+*.dmg
+*.AppImage
+*.deb
+*.snap
+
+# Log files
+*.log

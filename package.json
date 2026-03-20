@@ -1,7 +1,7 @@
 {
   "name": "ccide",
   "version": "0.2.4",
-  "description": "Terminal-centric IDE built on Claude Code",
+  "description": "A terminal-centric IDE for AI-powered CLI tools, built on Electron",
   "author": "Eliran Tutia",
   "license": "MIT",
   "repository": {

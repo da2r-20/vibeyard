@@ -1,0 +1,178 @@
+import { appState, ArchivedSession } from '../state.js';
+
+const MAX_VISIBLE = 50;
+
+let container: HTMLElement;
+let searchInput: HTMLInputElement;
+let listEl: HTMLElement;
+let collapsed = true;
+
+export function initSessionHistory(): void {
+  container = document.getElementById('session-history')!;
+  render();
+
+  appState.on('history-changed', render);
+  appState.on('project-changed', render);
+  appState.on('state-loaded', render);
+}
+
+function render(): void {
+  const project = appState.activeProject;
+  const history = project ? appState.getSessionHistory(project.id) : [];
+
+  if (!project) {
+    container.innerHTML = '';
+    return;
+  }
+
+  container.innerHTML = '';
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'config-section-header';
+  header.innerHTML = `
+    <span class="config-section-toggle ${collapsed ? 'collapsed' : ''}">&#x25BC;</span>
+    <span>History</span>
+    ${history.length > 0 ? `<span class="config-section-count">${history.length}</span>` : ''}
+  `;
+  header.addEventListener('click', () => {
+    collapsed = !collapsed;
+    render();
+  });
+  container.appendChild(header);
+
+  if (collapsed) return;
+
+  const body = document.createElement('div');
+  body.className = 'history-body';
+
+  if (history.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'history-empty';
+    empty.textContent = 'No session history yet';
+    body.appendChild(empty);
+    container.appendChild(body);
+    return;
+  }
+
+  // Search
+  searchInput = document.createElement('input');
+  searchInput.className = 'history-search';
+  searchInput.type = 'text';
+  searchInput.placeholder = 'Filter history...';
+  searchInput.addEventListener('input', () => renderList(history));
+  body.appendChild(searchInput);
+
+  // Clear button
+  const clearBtn = document.createElement('button');
+  clearBtn.className = 'history-clear-btn';
+  clearBtn.textContent = 'Clear History';
+  clearBtn.addEventListener('click', () => {
+    if (!project) return;
+    appState.clearSessionHistory(project.id);
+  });
+  body.appendChild(clearBtn);
+
+  // List
+  listEl = document.createElement('div');
+  listEl.className = 'history-list';
+  body.appendChild(listEl);
+
+  container.appendChild(body);
+  renderList(history);
+}
+
+function renderList(history: ArchivedSession[]): void {
+  const filter = searchInput?.value.toLowerCase() || '';
+  const filtered = history
+    .filter((a) => a.name.toLowerCase().includes(filter))
+    .reverse(); // newest first
+
+  listEl.innerHTML = '';
+
+  const visible = filtered.slice(0, MAX_VISIBLE);
+  for (const archived of visible) {
+    const item = document.createElement('div');
+    item.className = 'history-item';
+
+    const info = document.createElement('div');
+    info.className = 'history-item-info';
+
+    const name = document.createElement('div');
+    name.className = 'history-item-name';
+    name.textContent = archived.name;
+    name.title = archived.name;
+    info.appendChild(name);
+
+    const details = document.createElement('div');
+    details.className = 'history-item-details';
+    const parts: string[] = [];
+    parts.push(formatDate(archived.closedAt));
+    if (archived.cost) {
+      parts.push(`$${archived.cost.totalCostUsd.toFixed(2)}`);
+    }
+    details.textContent = parts.join(' · ');
+    info.appendChild(details);
+
+    item.appendChild(info);
+
+    const actions = document.createElement('div');
+    actions.className = 'history-item-actions';
+
+    if (archived.cliSessionId) {
+      const resumeBtn = document.createElement('button');
+      resumeBtn.className = 'history-resume-btn';
+      resumeBtn.textContent = 'Resume';
+      resumeBtn.title = 'Resume this session';
+      resumeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const project = appState.activeProject;
+        if (project) {
+          appState.resumeFromHistory(project.id, archived.id);
+        }
+      });
+      actions.appendChild(resumeBtn);
+    }
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'history-remove-btn';
+    removeBtn.innerHTML = '&times;';
+    removeBtn.title = 'Remove from history';
+    removeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const project = appState.activeProject;
+      if (project) {
+        appState.removeHistoryEntry(project.id, archived.id);
+      }
+    });
+    actions.appendChild(removeBtn);
+
+    item.appendChild(actions);
+
+    listEl.appendChild(item);
+  }
+
+  if (filtered.length > MAX_VISIBLE) {
+    const more = document.createElement('div');
+    more.className = 'history-item-details';
+    more.style.padding = '4px 12px';
+    more.textContent = `${filtered.length - MAX_VISIBLE} more items...`;
+    listEl.appendChild(more);
+  }
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffDays === 0) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } else if (diffDays === 1) {
+    return 'Yesterday';
+  } else if (diffDays < 7) {
+    return `${diffDays}d ago`;
+  }
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}

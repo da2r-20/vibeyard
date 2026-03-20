@@ -69,7 +69,7 @@ function onSessionAdded(data: unknown): void {
     renderLayout();
   } else {
     // Create and spawn immediately
-    createTerminalPane(session.id, project.path, session.cliSessionId, false, session.args || '', (session.providerId as import('../../shared/types').ProviderId) || 'claude', project.id);
+    createTerminalPane(session.id, project.path, session.cliSessionId, !!session.cliSessionId, session.args || '', (session.providerId as import('../../shared/types').ProviderId) || 'claude', project.id);
     renderLayout();
 
     // Spawn after layout is rendered so terminal has dimensions

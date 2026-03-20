@@ -16,6 +16,7 @@ import { initDebugPanel, logDebugEvent, setDebugVisible } from './components/deb
 import { initGitPanel } from './components/git-panel.js';
 import { disconnectInspector } from './components/mcp-inspector.js';
 import { initUpdateBanner } from './components/update-banner.js';
+import { initSessionHistory } from './components/session-history.js';
 
 let isQuitting = false;
 window.claudeIde.app.onQuitting(() => { isQuitting = true; });
@@ -86,6 +87,7 @@ async function main(): Promise<void> {
   initProjectTerminal();
   initDebugPanel();
   initGitPanel();
+  initSessionHistory();
   initUpdateBanner();
   startGitPolling();
 
@@ -101,7 +103,7 @@ async function main(): Promise<void> {
   const stateEvents = [
     'project-added', 'project-removed', 'project-changed',
     'session-added', 'session-removed', 'session-changed',
-    'layout-changed', 'state-loaded',
+    'layout-changed', 'history-changed', 'state-loaded',
   ] as const;
   for (const evt of stateEvents) {
     appState.on(evt as Parameters<typeof appState.on>[0], (data) => {

@@ -41,7 +41,8 @@ export class FilePathLinkProvider implements ILinkProvider {
       links.push({
         range,
         text: fullMatchText,
-        activate: (_event: MouseEvent, _text: string) => {
+        activate: (event: MouseEvent, _text: string) => {
+          if (!event.metaKey) return;
           appState.addFileReaderSession(this.projectId, filePath, lineNumber);
         },
       });

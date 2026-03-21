@@ -11,20 +11,34 @@ const sidebarEl = document.getElementById('sidebar')!;
 const resizeHandle = document.getElementById('sidebar-resize-handle')!;
 
 const sidebarFooterEl = document.getElementById('sidebar-footer')!;
+const btnToggleSidebar = document.getElementById('btn-toggle-sidebar')!;
 
 const SIDEBAR_MIN = 150;
 const SIDEBAR_MAX = 500;
 
+export function toggleSidebar(): void {
+  appState.toggleSidebar();
+}
+
+function applySidebarCollapsed(): void {
+  const collapsed = appState.sidebarCollapsed;
+  sidebarEl.classList.toggle('collapsed', collapsed);
+  resizeHandle.style.display = collapsed ? 'none' : '';
+}
+
 export function initSidebar(): void {
   btnAddProject.addEventListener('click', promptNewProject);
   btnPreferences.addEventListener('click', showPreferencesModal);
+  btnToggleSidebar.addEventListener('click', toggleSidebar);
   initResizeHandle();
   appState.on('state-loaded', () => {
     if (appState.sidebarWidth) {
       sidebarEl.style.width = appState.sidebarWidth + 'px';
     }
+    applySidebarCollapsed();
     render();
   });
+  appState.on('sidebar-toggled', applySidebarCollapsed);
   appState.on('project-added', render);
   appState.on('project-removed', render);
   appState.on('project-changed', render);

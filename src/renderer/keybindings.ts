@@ -1,5 +1,5 @@
 import { appState } from './state.js';
-import { promptNewProject } from './components/sidebar.js';
+import { promptNewProject, toggleSidebar } from './components/sidebar.js';
 import { quickNewSession } from './components/tab-bar.js';
 import { toggleProjectTerminal } from './components/project-terminal.js';
 import { toggleDebugPanel } from './components/debug-panel.js';
@@ -33,6 +33,7 @@ export function initKeybindings(): void {
   }
   shortcutManager.registerHandler('next-session', () => appState.cycleSession(1));
   shortcutManager.registerHandler('prev-session', () => appState.cycleSession(-1));
+  shortcutManager.registerHandler('toggle-sidebar', () => toggleSidebar());
   shortcutManager.registerHandler('toggle-split', () => appState.toggleSplit());
   shortcutManager.registerHandler('project-terminal', () => toggleProjectTerminal());
   shortcutManager.registerHandler('debug-panel', () => toggleDebugPanel());

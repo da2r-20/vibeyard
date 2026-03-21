@@ -675,6 +675,24 @@ describe('setSidebarWidth()', () => {
   });
 });
 
+describe('toggleSidebar()', () => {
+  it('toggles sidebarCollapsed, persists, and emits', () => {
+    expect(appState.sidebarCollapsed).toBe(false);
+    const cb = vi.fn();
+    appState.on('sidebar-toggled', cb);
+    appState.toggleSidebar();
+    expect(appState.sidebarCollapsed).toBe(true);
+    expect(cb).toHaveBeenCalledTimes(1);
+    expect(mockSave).toHaveBeenCalled();
+  });
+
+  it('toggles back to false', () => {
+    appState.toggleSidebar(); // true
+    appState.toggleSidebar(); // false
+    expect(appState.sidebarCollapsed).toBe(false);
+  });
+});
+
 describe('setTerminalPanelOpen()', () => {
   it('sets terminalPanelOpen on active project and emits', () => {
     addProject();

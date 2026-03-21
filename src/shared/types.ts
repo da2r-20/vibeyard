@@ -152,6 +152,7 @@ export interface PersistedState {
   activeProjectId: string | null;
   preferences: Preferences;
   sidebarWidth?: number;
+  sidebarCollapsed?: boolean;
 }
 
 // --- AI Readiness ---

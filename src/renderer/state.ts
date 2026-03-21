@@ -24,6 +24,7 @@ type EventType =
   | 'history-changed'
   | 'insights-changed'
   | 'readiness-changed'
+  | 'sidebar-toggled'
   | 'state-loaded';
 
 type EventCallback = (data?: unknown) => void;
@@ -102,6 +103,16 @@ class AppState {
   setSidebarWidth(width: number): void {
     this.state.sidebarWidth = width;
     this.persist();
+  }
+
+  get sidebarCollapsed(): boolean {
+    return this.state.sidebarCollapsed ?? false;
+  }
+
+  toggleSidebar(): void {
+    this.state.sidebarCollapsed = !this.sidebarCollapsed;
+    this.persist();
+    this.emit('sidebar-toggled');
   }
 
   setTerminalPanelOpen(open: boolean): void {

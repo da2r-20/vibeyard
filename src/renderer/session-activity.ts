@@ -7,6 +7,7 @@ type StatusChangeCallback = (sessionId: string, status: SessionStatus) => void;
 interface SessionState {
   status: SessionStatus;
   stalenessTimer: ReturnType<typeof setTimeout> | null;
+  interrupted: boolean;
 }
 
 const sessions = new Map<string, SessionState>();
@@ -33,6 +34,13 @@ export function setHookStatus(sessionId: string, status: 'working' | 'waiting' |
   // Completed is sticky until a new prompt ('working') or PTY exit ('idle').
   if (status === 'waiting' && state.status === 'completed') return;
 
+  // Ignore stale 'working' hooks that arrive after an interrupt (e.g. PostToolUse
+  // firing after the user pressed Escape and we already transitioned to 'waiting').
+  if (status === 'working' && state.interrupted) return;
+
+  // Any non-working hook clears the interrupt flag (CLI reached a definitive state).
+  if (status !== 'working') state.interrupted = false;
+
   setStatus(sessionId, status);
 
   if (status === 'working') {
@@ -44,7 +52,7 @@ export function setHookStatus(sessionId: string, status: 'working' | 'waiting' |
 }
 
 export function initSession(sessionId: string): void {
-  sessions.set(sessionId, { status: 'waiting', stalenessTimer: null });
+  sessions.set(sessionId, { status: 'waiting', stalenessTimer: null, interrupted: false });
   for (const cb of listeners) cb(sessionId, 'waiting');
 }
 
@@ -63,6 +71,15 @@ export function notifyPtyData(sessionId: string): void {
     state.stalenessTimer = null;
     setStatus(sessionId, 'waiting');
   }, STALENESS_TIMEOUT_MS);
+}
+
+export function notifyInterrupt(sessionId: string): void {
+  const state = sessions.get(sessionId);
+  if (!state || state.status !== 'working') return;
+  if (state.stalenessTimer !== null) clearTimeout(state.stalenessTimer);
+  state.stalenessTimer = null;
+  state.interrupted = true;
+  setStatus(sessionId, 'waiting');
 }
 
 export function setIdle(sessionId: string): void {

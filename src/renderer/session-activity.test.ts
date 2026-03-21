@@ -2,6 +2,7 @@ import {
   initSession,
   setHookStatus,
   notifyPtyData,
+  notifyInterrupt,
   setIdle,
   removeSession,
   getStatus,
@@ -128,6 +129,65 @@ describe('notifyPtyData', () => {
   it('does nothing for unknown session', () => {
     notifyPtyData('unknown');
     expect(getStatus('unknown')).toBe('idle');
+  });
+});
+
+describe('notifyInterrupt', () => {
+  it('transitions from working to waiting', () => {
+    initSession('s1');
+    setHookStatus('s1', 'working');
+    notifyInterrupt('s1');
+    expect(getStatus('s1')).toBe('waiting');
+  });
+
+  it('clears staleness timer', () => {
+    initSession('s1');
+    setHookStatus('s1', 'working');
+    notifyInterrupt('s1');
+
+    // Timer should be cleared — no spurious transition after 120s
+    vi.advanceTimersByTime(120_000);
+    expect(getStatus('s1')).toBe('waiting');
+  });
+
+  it('does nothing when not in working state', () => {
+    initSession('s1');
+    notifyInterrupt('s1');
+    expect(getStatus('s1')).toBe('waiting');
+
+    setHookStatus('s1', 'completed');
+    notifyInterrupt('s1');
+    expect(getStatus('s1')).toBe('completed');
+  });
+
+  it('does nothing for unknown session', () => {
+    notifyInterrupt('unknown'); // should not throw
+    expect(getStatus('unknown')).toBe('idle');
+  });
+
+  it('ignores stale working hooks after interrupt', () => {
+    initSession('s1');
+    setHookStatus('s1', 'working');
+    notifyInterrupt('s1');
+    expect(getStatus('s1')).toBe('waiting');
+
+    // A stale PostToolUse 'working' hook arrives after the interrupt
+    setHookStatus('s1', 'working');
+    expect(getStatus('s1')).toBe('waiting');
+  });
+
+  it('clears interrupted flag on non-working hook status', () => {
+    initSession('s1');
+    setHookStatus('s1', 'working');
+    notifyInterrupt('s1');
+
+    // CLI fires a definitive 'completed' — clears the interrupted flag
+    setHookStatus('s1', 'completed');
+    expect(getStatus('s1')).toBe('completed');
+
+    // Now a new 'working' prompt should be accepted again
+    setHookStatus('s1', 'working');
+    expect(getStatus('s1')).toBe('working');
   });
 });
 

@@ -4,7 +4,7 @@ import { initTabBar } from './components/tab-bar.js';
 import { initSplitLayout } from './components/split-layout.js';
 import { initKeybindings } from './keybindings.js';
 import { handlePtyData, destroyTerminal, updateCostDisplay, updateContextDisplay } from './components/terminal-pane.js';
-import { setIdle, setHookStatus, notifyPtyData } from './session-activity.js';
+import { setIdle, setHookStatus, notifyPtyData, notifyInterrupt } from './session-activity.js';
 import { parseCost, setCostData, onChange as onCostChange } from './session-cost.js';
 import { setContextData, onChange as onContextChange } from './session-context.js';
 import { initConfigSections } from './components/config-sections.js';
@@ -34,7 +34,11 @@ async function main(): Promise<void> {
     } else if (!isMcpSession(sessionId)) {
       handlePtyData(sessionId, data);
       parseCost(sessionId, data);
-      notifyPtyData(sessionId);
+      if (data.includes('Interrupted')) {
+        notifyInterrupt(sessionId);
+      } else {
+        notifyPtyData(sessionId);
+      }
     }
   });
 

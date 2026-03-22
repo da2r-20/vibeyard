@@ -22,6 +22,8 @@ import { showUsageModal } from './components/usage-modal.js';
 import { captureInitialContext } from './session-insights.js';
 import { initInsightAlert } from './components/insight-alert.js';
 import { initReadinessSection } from './components/readiness-section.js';
+import { initToolDetector } from './tools/missing-tool-detector.js';
+import { initToolAlert } from './components/tool-alert.js';
 
 let isQuitting = false;
 window.claudeIde.app.onQuitting(() => { isQuitting = true; });
@@ -104,6 +106,8 @@ async function main(): Promise<void> {
   initSessionHistory();
   initUpdateBanner();
   initInsightAlert();
+  initToolDetector();
+  initToolAlert();
   initReadinessSection();
   startGitPolling();
 

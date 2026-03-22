@@ -204,6 +204,14 @@ export interface CostData {
   };
 }
 
+// --- Tool Failure ---
+
+export interface ToolFailureData {
+  tool_name: string;
+  tool_input: Record<string, unknown>;
+  error: string;
+}
+
 // --- MCP ---
 
 export interface McpResult {

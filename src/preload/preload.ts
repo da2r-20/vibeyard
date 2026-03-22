@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { CostData, ProviderId, CliProviderMeta, StatsCache, ReadinessResult } from '../shared/types';
+import type { CostData, ProviderId, CliProviderMeta, StatsCache, ReadinessResult, ToolFailureData } from '../shared/types';
 
 export type { CostData } from '../shared/types';
 
@@ -20,6 +20,7 @@ export interface ClaudeIdeApi {
     /** @deprecated Use onCliSessionId instead */
     onClaudeSessionId(callback: (sessionId: string, claudeSessionId: string) => void): () => void;
     onCostData(callback: (sessionId: string, costData: CostData) => void): () => void;
+    onToolFailure(callback: (sessionId: string, data: ToolFailureData) => void): () => void;
   };
   fs: {
     isDirectory(path: string): Promise<boolean>;
@@ -125,6 +126,9 @@ const api: ClaudeIdeApi = {
     onCostData: (callback) =>
       onChannel('session:costData', (sessionId, costData) =>
         callback(sessionId as string, costData as CostData)),
+    onToolFailure: (callback) =>
+      onChannel('session:toolFailure', (sessionId, data) =>
+        callback(sessionId as string, data as ToolFailureData)),
   },
   fs: {
     isDirectory: (path) => ipcRenderer.invoke('fs:isDirectory', path),

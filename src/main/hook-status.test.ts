@@ -241,13 +241,14 @@ describe('hook-status', () => {
   });
 
   describe('cleanupSessionStatus', () => {
-    it('unlinks all 3 file types', () => {
+    it('unlinks all 4 file types', () => {
       cleanupSessionStatus('sess-1');
 
       expect(fs.unlinkSync).toHaveBeenCalledWith('/tmp/ccide/sess-1.status');
       expect(fs.unlinkSync).toHaveBeenCalledWith('/tmp/ccide/sess-1.sessionid');
       expect(fs.unlinkSync).toHaveBeenCalledWith('/tmp/ccide/sess-1.cost');
-      expect(fs.unlinkSync).toHaveBeenCalledTimes(3);
+      expect(fs.unlinkSync).toHaveBeenCalledWith('/tmp/ccide/sess-1.toolfailure');
+      expect(fs.unlinkSync).toHaveBeenCalledTimes(4);
     });
 
     it('handles errors when files do not exist', () => {

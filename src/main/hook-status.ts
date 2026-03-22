@@ -6,9 +6,15 @@ import { BrowserWindow } from 'electron';
 export const STATUS_DIR = path.join(os.tmpdir(), 'ccide');
 const STATUSLINE_SCRIPT = path.join(STATUS_DIR, 'statusline.sh');
 
+const KNOWN_EXTENSIONS = ['.status', '.sessionid', '.cost', '.toolfailure'];
+
 let watcher: fs.FSWatcher | null = null;
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 const lastMtimes = new Map<string, number>();
+
+function isKnownExtension(filename: string): boolean {
+  return KNOWN_EXTENSIONS.some(ext => filename.endsWith(ext));
+}
 
 export function getStatusLineScriptPath(): string {
   return STATUSLINE_SCRIPT;
@@ -86,6 +92,24 @@ function handleFileChange(win: BrowserWindow, filename: string): void {
     } catch {
       // File may have been deleted or contain invalid JSON
     }
+  } else if (filename.endsWith('.toolfailure')) {
+    // Filename format: {sessionId}-{randomSuffix}.toolfailure
+    const base = filename.replace('.toolfailure', '');
+    const lastDash = base.lastIndexOf('-');
+    const sessionId = lastDash !== -1 ? base.slice(0, lastDash) : base;
+    const filePath = path.join(STATUS_DIR, filename);
+
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8').trim();
+      const data = JSON.parse(content);
+      if (!win.isDestroyed()) {
+        win.webContents.send('session:toolFailure', sessionId, data);
+      }
+    } catch {
+      // File may have been deleted or contain invalid JSON
+    }
+    // Always attempt cleanup — each failure is a one-shot event
+    try { fs.unlinkSync(filePath); } catch { /* already gone */ }
   }
 }
 
@@ -95,7 +119,7 @@ function pollForChanges(win: BrowserWindow): void {
   try {
     const files = fs.readdirSync(STATUS_DIR);
     for (const filename of files) {
-      if (!filename.endsWith('.status') && !filename.endsWith('.sessionid') && !filename.endsWith('.cost')) continue;
+      if (!isKnownExtension(filename)) continue;
       const filePath = path.join(STATUS_DIR, filename);
       try {
         const stat = fs.statSync(filePath);
@@ -154,7 +178,7 @@ export function resyncAllSessions(win: BrowserWindow): void {
   try {
     const files = fs.readdirSync(STATUS_DIR);
     for (const filename of files) {
-      if (filename.endsWith('.status') || filename.endsWith('.sessionid') || filename.endsWith('.cost')) {
+      if (isKnownExtension(filename)) {
         handleFileChange(win, filename);
       }
     }
@@ -173,7 +197,7 @@ export function startWatching(win: BrowserWindow): void {
 }
 
 export function cleanupSessionStatus(sessionId: string): void {
-  for (const ext of ['.status', '.sessionid', '.cost']) {
+  for (const ext of KNOWN_EXTENSIONS) {
     try {
       fs.unlinkSync(path.join(STATUS_DIR, `${sessionId}${ext}`));
     } catch {
@@ -191,7 +215,7 @@ export function cleanupAll(): void {
   try {
     const files = fs.readdirSync(STATUS_DIR);
     for (const file of files) {
-      if (file.endsWith('.status') || file.endsWith('.sessionid') || file.endsWith('.cost')) {
+      if (isKnownExtension(file)) {
         fs.unlinkSync(path.join(STATUS_DIR, file));
       }
     }

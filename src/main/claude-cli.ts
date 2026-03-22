@@ -213,6 +213,11 @@ export function installHooks(): void {
   const captureSessionIdCmd =
     `sh -c 'input=$(cat); sid=$(echo "$input" | /usr/bin/python3 -c "import sys,json; print(json.load(sys.stdin).get(\\"session_id\\",\\"\\"))" 2>/dev/null); if [ -n "$sid" ]; then mkdir -p ${STATUS_DIR} && echo "$sid" > ${STATUS_DIR}/$CLAUDE_IDE_SESSION_ID.sessionid; fi ${HOOK_MARKER}'`;
 
+  // Hook to capture tool failure details (tool_name, tool_input, error) for missing-tool detection.
+  // Uses a random suffix to avoid filename collisions when multiple tools fail rapidly.
+  const captureToolFailureCmd =
+    `sh -c 'cat | /usr/bin/python3 -c "import sys,json,os,random,string; d=json.load(sys.stdin); sid=os.environ.get(\\"CLAUDE_IDE_SESSION_ID\\",\\"\\"); tn=d.get(\\"tool_name\\",\\"\\"); ti=d.get(\\"tool_input\\",{}); err=d.get(\\"error\\",\\"\\"); sfx=\\"\\".join(random.choices(string.ascii_lowercase,k=6)); json.dump({\\"tool_name\\":tn,\\"tool_input\\":ti,\\"error\\":err},open(f\\"${STATUS_DIR}/\\"+sid+\\"-\\"+sfx+\\".toolfailure\\",\\"w\\")) if sid and tn else None" 2>/dev/null ${HOOK_MARKER}'`;
+
   // Add our hooks for each event type
   const ideEvents: Record<string, string> = {
     SessionStart: 'waiting',
@@ -230,6 +235,10 @@ export function installHooks(): void {
     // Capture Claude session ID on session start and prompt submission
     if (event === 'SessionStart' || event === 'UserPromptSubmit') {
       hooks.push({ type: 'command', command: captureSessionIdCmd });
+    }
+    // Capture tool failure details for missing-tool detection
+    if (event === 'PostToolUseFailure') {
+      hooks.push({ type: 'command', command: captureToolFailureCmd });
     }
     existing.push({
       matcher: '',

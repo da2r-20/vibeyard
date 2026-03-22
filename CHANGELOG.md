@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.8] - 2026-03-22
+
+### Features
+- MacOS code signing and notarization for CI builds
+- Logo and shields.io badges to README
+- App icon for all platforms
+- Auto-open new project modal when app starts with no projects
+- Max character limit for session title names
+- Tests for toolfailure file handling and detector edge cases
+- Missing tool detection alerts via PostToolUseFailure hooks
+- Dimmed empty cell with new session button in swarm mode grid
+- Side panel for non-CLI tabs in swarm mode
+- Sidebar toggle when clicking the active project
+- Unread border indicator for swarm mode panes
+- Swarm mode to display all sessions simultaneously in a grid
+
+### Fixes
+- Empty sessions being saved to history on close
+- Swarm mode not showing sessions resumed from history
+- Swarm mode grid order not persisting across restarts
+
+### Changes
+- README logo to transparent background version
+- SoundOnSessionWaiting default to enabled
+- Rename app from CCIDE to Vibeyard
+- Expand missing tool catalog and remove hardcoded install instructions
+- README with swarm mode and missing tool alerts features
+- Default layout mode to swarm for new projects
+- Allow swarm mode with a single session
+
 ## [0.2.7] - 2026-03-22
 
 ### Features

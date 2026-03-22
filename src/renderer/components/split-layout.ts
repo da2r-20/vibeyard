@@ -37,6 +37,7 @@ import {
   getFileReaderInstance,
   setFileReaderLine,
 } from './file-reader.js';
+import { quickNewSession } from './tab-bar.js';
 
 const container = document.getElementById('terminal-container')!;
 
@@ -249,6 +250,7 @@ function renderSwarmMode(project: ProjectRecord): void {
   const rows = Math.ceil(count / cols);
 
   container.querySelectorAll('.swarm-grid-wrapper').forEach(el => el.remove());
+  container.querySelectorAll('.swarm-empty-cell').forEach(el => el.remove());
 
   const activeSession = project.sessions.find(s => s.id === project.activeSessionId);
   const isNonCliActive = activeSession?.type && activeSession.type !== 'claude';
@@ -266,15 +268,33 @@ function renderSwarmMode(project: ProjectRecord): void {
     container.appendChild(gridWrapper);
 
     showPanes(project, gridWrapper);
+    appendEmptyCells(cols * rows - count, gridWrapper);
     attachNonCliPane(activeSession, container, true);
   } else {
     container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
     container.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
     showPanes(project);
+    appendEmptyCells(cols * rows - count, container);
   }
 
   updateSwarmPaneStyles(project);
   focusActivePane(project);
+}
+
+function appendEmptyCells(count: number, target: HTMLElement): void {
+  for (let i = 0; i < count; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'swarm-empty-cell';
+
+    const btn = document.createElement('button');
+    btn.className = 'swarm-empty-add-btn';
+    btn.textContent = '+';
+    btn.title = 'New session';
+    btn.addEventListener('click', () => quickNewSession());
+
+    cell.appendChild(btn);
+    target.appendChild(cell);
+  }
 }
 
 function updateSwarmPaneStyles(project: ProjectRecord): void {

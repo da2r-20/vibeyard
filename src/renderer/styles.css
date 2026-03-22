@@ -470,7 +470,39 @@ body.debug-panel-open #app {
   overflow: hidden;
 }
 
-.terminal-pane.swarm-dimmed::after {
+.swarm-empty-cell {
+  position: relative;
+  border: 2px solid var(--pane-unfocus);
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.swarm-empty-add-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid var(--pane-unfocus);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.swarm-empty-add-btn:hover {
+  border-color: var(--pane-focus);
+  color: var(--text-primary);
+}
+
+.terminal-pane.swarm-dimmed::after,
+.swarm-empty-cell::after {
   content: '';
   position: absolute;
   top: 0;

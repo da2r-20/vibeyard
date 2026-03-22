@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.7] - 2026-03-22
+
+### Features
+- Copy session ID option to tab context menu
+- Auto-naming sessions from CLI conversation title
+- Collapsible sidebar with toggle button and Cmd+B shortcut
+- Cmd+F search in file-reader and diff-viewer panes
+- Cmd+Click requirement to open files from terminal links
+- .ccideignore for AI readiness large-file scan exclusions
+- AI readiness scanner with auto-created .ccideignore for large-file exclusions
+- Default args per project with checkbox to persist across sessions
+- Insights preferences toggle and fix-in-new-session CTA button
+- Big initial context alert when pre-context exceeds 15% of context window
+- Cost and context window persistence across app restarts
+- Usage stats modal reading Claude Code's stats-cache.json
+- Preference to disable session history archiving
+
+### Fixes
+- Cost details text overlapping labels in help modal
+- Empty gap between terminal and debug panel
+- Session stuck on working state after Escape interrupt
+- Waiting status description in help modal to be more accurate
+- Fs:readFile blocking config files outside project directories
+- Git panel flickering: debounce refreshes, in-place DOM updates, skip redundant rebuilds
+- Use statusLine setting instead of deprecated CLAUDE_CODE_STATUSLINE env var for cost/context data
+- Status bar reliability: handle macOS fs.watch null filename, add polling fallback, fix context window field names
+- Tab drag reorder and add move left/right context menu options
+
+### Changes
+- Remove ptyData logging from debug panel for better performance
+- Remove red focus stroke from terminal panes
+- Remove stale scan badge from AI Readiness section
+- Update theme background colors to black
+- Update README with AI Readiness Score feature
+- Improve git polling to pause when app is inactive or no project is open
+- Update README with recent features and remove Linux installation section
+- Update wide modal width from 700px to 850px max-width
+
 ## [0.2.6] - 2026-03-20
 
 ### Features

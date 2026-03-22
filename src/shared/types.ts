@@ -120,7 +120,7 @@ export interface ProjectRecord {
   sessions: SessionRecord[];
   activeSessionId: string | null;
   layout: {
-    mode: 'tabs' | 'split';
+    mode: 'tabs' | 'split' | 'swarm';
     splitPanes: string[];
     splitDirection: 'horizontal' | 'vertical';
   };

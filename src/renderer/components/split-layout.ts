@@ -51,6 +51,20 @@ export function initSplitLayout(): void {
   window.addEventListener('resize', () => {
     requestAnimationFrame(fitAllVisible);
   });
+
+  // Click delegation for swarm mode: clicking a dimmed pane makes it active
+  container.addEventListener('mousedown', (e) => {
+    const project = appState.activeProject;
+    if (!project || project.layout.mode !== 'swarm') return;
+
+    const paneEl = (e.target as HTMLElement).closest('.terminal-pane') as HTMLElement | null;
+    if (!paneEl) return;
+
+    const sessionId = paneEl.dataset.sessionId;
+    if (sessionId && sessionId !== project.activeSessionId) {
+      appState.setActiveSession(project.id, sessionId);
+    }
+  });
 }
 
 function onSessionAdded(data: unknown): void {
@@ -133,7 +147,9 @@ export function renderLayout(): void {
   hideAllFileViewerPanes();
   hideAllFileReaderPanes();
 
-  if (project.layout.mode === 'split' && project.layout.splitPanes.length > 1) {
+  if (project.layout.mode === 'swarm' && project.layout.splitPanes.length >= 2) {
+    renderSwarmMode(project);
+  } else if (project.layout.mode === 'split' && project.layout.splitPanes.length > 1) {
     renderSplitMode(project);
   } else {
     renderTabMode(project);
@@ -144,6 +160,8 @@ export function renderLayout(): void {
 
 function renderTabMode(project: ProjectRecord): void {
   container.className = '';
+  container.style.gridTemplateColumns = '';
+  container.style.gridTemplateRows = '';
 
   const activeId = project.activeSessionId;
   if (!activeId) return;
@@ -182,9 +200,8 @@ function renderTabMode(project: ProjectRecord): void {
   }
 }
 
-function renderSplitMode(project: ProjectRecord): void {
-  container.className = `split-${project.layout.splitDirection}`;
-
+/** Attach, show, and ensure-spawn for each pane in the list. */
+function showPanes(project: ProjectRecord): void {
   for (const paneId of project.layout.splitPanes) {
     const session = project.sessions.find(s => s.id === paneId);
     if (session?.type === 'file-reader') {
@@ -209,22 +226,49 @@ function renderSplitMode(project: ProjectRecord): void {
     attachToContainer(paneId, container);
     showPane(paneId, true);
 
-    // Ensure spawned
     const instance = getTerminalInstance(paneId);
     if (instance && !instance.spawned && !instance.exited) {
-      requestAnimationFrame(() => {
-        spawnTerminal(paneId);
-        fitAllVisible();
-      });
+      requestAnimationFrame(() => spawnTerminal(paneId));
     }
   }
+}
 
-  // Focus active session
+function focusActivePane(project: ProjectRecord): void {
   if (project.activeSessionId && project.layout.splitPanes.includes(project.activeSessionId)) {
     setFocused(project.activeSessionId);
   } else if (project.layout.splitPanes.length > 0) {
     setFocused(project.layout.splitPanes[0]);
   }
+}
+
+function renderSplitMode(project: ProjectRecord): void {
+  container.className = `split-${project.layout.splitDirection}`;
+  container.style.gridTemplateColumns = '';
+  container.style.gridTemplateRows = '';
+  showPanes(project);
+  focusActivePane(project);
+}
+
+function renderSwarmMode(project: ProjectRecord): void {
+  const count = project.layout.splitPanes.length;
+  const cols = Math.ceil(Math.sqrt(count));
+  const rows = Math.ceil(count / cols);
+
+  container.className = 'swarm-mode';
+  container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  container.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+
+  showPanes(project);
+
+  // Dim non-active panes
+  for (const paneId of project.layout.splitPanes) {
+    const instance = getTerminalInstance(paneId);
+    if (instance) {
+      instance.element.classList.toggle('swarm-dimmed', paneId !== project.activeSessionId);
+    }
+  }
+
+  focusActivePane(project);
 }
 
 function showEmptyState(project: ProjectRecord | undefined): void {

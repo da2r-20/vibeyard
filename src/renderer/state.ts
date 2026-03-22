@@ -188,6 +188,10 @@ class AppState {
     };
     project.sessions.push(session);
     project.activeSessionId = session.id;
+    // Auto-add to swarm if in swarm mode and under limit
+    if (project.layout.mode === 'swarm') {
+      project.layout.splitPanes.push(session.id);
+    }
     this.persist();
     this.emit('session-added', { projectId, session });
     this.emit('session-changed');
@@ -297,8 +301,13 @@ class AppState {
       const newIndex = closingIndex > 0 ? closingIndex - 1 : 0;
       project.activeSessionId = project.sessions[newIndex]?.id ?? null;
     }
-    // Also remove from split panes
+    // Also remove from split/swarm panes
     project.layout.splitPanes = project.layout.splitPanes.filter((id) => id !== sessionId);
+    // Auto-exit swarm if fewer than 2 panes remain
+    if (project.layout.mode === 'swarm' && project.layout.splitPanes.length < 2) {
+      project.layout.mode = 'tabs';
+      project.layout.splitPanes = [];
+    }
     this.persist();
     this.emit('session-removed', { projectId, sessionId });
     this.emit('session-changed');
@@ -471,25 +480,34 @@ class AppState {
   }
 
   toggleSplit(): void {
+    this.toggleSwarm();
+  }
+
+  toggleSwarm(): void {
     const project = this.activeProject;
     if (!project) return;
 
-    if (project.layout.mode === 'tabs') {
-      project.layout.mode = 'split';
-      // Add active session and next session to split panes
-      const sessionIds = project.sessions.map((s) => s.id);
-      project.layout.splitPanes = [];
-      if (project.activeSessionId) {
-        project.layout.splitPanes.push(project.activeSessionId);
-      }
-      const activeIdx = sessionIds.indexOf(project.activeSessionId ?? '');
-      const nextIdx = (activeIdx + 1) % sessionIds.length;
-      if (sessionIds[nextIdx] && !project.layout.splitPanes.includes(sessionIds[nextIdx])) {
-        project.layout.splitPanes.push(sessionIds[nextIdx]);
-      }
-    } else {
+    if (project.layout.mode === 'swarm') {
       project.layout.mode = 'tabs';
       project.layout.splitPanes = [];
+    } else {
+      const cliSessions = project.sessions.filter(
+        (s) => !s.type || s.type === 'claude'
+      );
+      if (cliSessions.length < 2) return; // Need at least 2 sessions
+
+      project.layout.mode = 'swarm';
+      project.layout.splitPanes = [];
+
+      if (project.activeSessionId && cliSessions.some((s) => s.id === project.activeSessionId)) {
+        project.layout.splitPanes.push(project.activeSessionId);
+      }
+
+      for (const s of cliSessions) {
+        if (!project.layout.splitPanes.includes(s.id)) {
+          project.layout.splitPanes.push(s.id);
+        }
+      }
     }
     this.persist();
     this.emit('layout-changed');

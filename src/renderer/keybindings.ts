@@ -18,7 +18,7 @@ export function initKeybindings(): void {
   // These handlers receive events forwarded from the main process menu
   window.claudeIde.menu.onNewProject(() => promptNewProject());
   window.claudeIde.menu.onNewSession(() => quickNewSession());
-  window.claudeIde.menu.onToggleSplit(() => appState.toggleSplit());
+  window.claudeIde.menu.onToggleSplit(() => appState.toggleSwarm());
   window.claudeIde.menu.onNextSession(() => appState.cycleSession(1));
   window.claudeIde.menu.onPrevSession(() => appState.cycleSession(-1));
   window.claudeIde.menu.onGotoSession((index) => appState.gotoSession(index));
@@ -34,7 +34,7 @@ export function initKeybindings(): void {
   shortcutManager.registerHandler('next-session', () => appState.cycleSession(1));
   shortcutManager.registerHandler('prev-session', () => appState.cycleSession(-1));
   shortcutManager.registerHandler('toggle-sidebar', () => toggleSidebar());
-  shortcutManager.registerHandler('toggle-split', () => appState.toggleSplit());
+  shortcutManager.registerHandler('toggle-split', () => appState.toggleSwarm());
   shortcutManager.registerHandler('project-terminal', () => toggleProjectTerminal());
   shortcutManager.registerHandler('debug-panel', () => toggleDebugPanel());
   shortcutManager.registerHandler('git-panel', () => toggleGitPanel());

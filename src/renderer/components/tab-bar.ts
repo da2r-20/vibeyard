@@ -11,7 +11,7 @@ const tabListEl = document.getElementById('tab-list')!;
 const gitStatusEl = document.getElementById('git-status')!;
 const btnAddSession = document.getElementById('btn-add-session')!;
 const btnAddMcpInspector = document.getElementById('btn-add-mcp-inspector')!;
-const btnToggleSplit = document.getElementById('btn-toggle-split')!;
+const btnToggleSwarm = document.getElementById('btn-toggle-swarm')!;
 const btnHelp = document.getElementById('btn-help')!;
 
 let activeContextMenu: HTMLElement | null = null;
@@ -29,7 +29,7 @@ export function initTabBar(): void {
     showAddSessionContextMenu(e.clientX, e.clientY);
   });
   btnAddMcpInspector.addEventListener('click', promptNewMcpInspector);
-  btnToggleSplit.addEventListener('click', () => appState.toggleSplit());
+  btnToggleSwarm.addEventListener('click', () => appState.toggleSwarm());
   btnHelp.addEventListener('click', () => showHelpDialog());
   gitStatusEl.addEventListener('click', () => scrollToGitPanel());
 
@@ -355,8 +355,8 @@ function render(): void {
     tabListEl.appendChild(tab);
   }
 
-  // Update split toggle button visual
-  btnToggleSplit.style.color = project.layout.mode === 'split' ? 'var(--accent)' : '';
+  // Update swarm toggle button visual
+  btnToggleSwarm.style.color = project.layout.mode === 'swarm' ? 'var(--accent)' : '';
 }
 
 function renderGitStatus(): void {

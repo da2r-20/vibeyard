@@ -459,6 +459,24 @@ body.debug-panel-open #app {
   gap: 2px;
 }
 
+#terminal-container.swarm-mode {
+  display: grid;
+  gap: 2px;
+}
+
+.terminal-pane.swarm-dimmed::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.25);
+  pointer-events: none;
+  z-index: 10;
+  transition: opacity 0.15s ease;
+}
+
 .terminal-pane {
   position: absolute;
   top: 0;

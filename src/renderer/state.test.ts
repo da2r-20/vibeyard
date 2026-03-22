@@ -565,32 +565,58 @@ describe('renameSession()', () => {
   });
 });
 
-describe('toggleSplit()', () => {
-  it('switches from tabs to split and populates splitPanes', () => {
+describe('toggleSplit() / toggleSwarm()', () => {
+  it('switches from tabs to swarm and populates splitPanes', () => {
     const { project, sessions } = addProjectWithSessions(3);
     // active session is sessions[2] (the last added)
-    appState.toggleSplit();
+    appState.toggleSwarm();
     const layout = appState.activeProject!.layout;
-    expect(layout.mode).toBe('split');
+    expect(layout.mode).toBe('swarm');
     expect(layout.splitPanes).toContain(sessions[2].id);
-    expect(layout.splitPanes.length).toBe(2);
+    expect(layout.splitPanes.length).toBe(3);
   });
 
-  it('switches from split back to tabs and clears splitPanes', () => {
+  it('switches from swarm back to tabs and clears splitPanes', () => {
     addProjectWithSessions(2);
-    appState.toggleSplit(); // tabs -> split
-    appState.toggleSplit(); // split -> tabs
+    appState.toggleSwarm(); // tabs -> swarm
+    appState.toggleSwarm(); // swarm -> tabs
     const layout = appState.activeProject!.layout;
     expect(layout.mode).toBe('tabs');
     expect(layout.splitPanes).toEqual([]);
+  });
+
+  it('toggleSplit delegates to toggleSwarm', () => {
+    addProjectWithSessions(2);
+    appState.toggleSplit();
+    expect(appState.activeProject!.layout.mode).toBe('swarm');
   });
 
   it('emits layout-changed', () => {
     addProjectWithSessions(2);
     const cb = vi.fn();
     appState.on('layout-changed', cb);
-    appState.toggleSplit();
+    appState.toggleSwarm();
     expect(cb).toHaveBeenCalledTimes(1);
+  });
+
+  it('includes all CLI sessions in splitPanes', () => {
+    addProjectWithSessions(8);
+    appState.toggleSwarm();
+    const layout = appState.activeProject!.layout;
+    expect(layout.splitPanes.length).toBe(8);
+  });
+
+  it('does not enter swarm with fewer than 2 CLI sessions', () => {
+    addProjectWithSessions(1);
+    appState.toggleSwarm();
+    expect(appState.activeProject!.layout.mode).toBe('tabs');
+  });
+
+  it('places activeSessionId first in splitPanes', () => {
+    const { project, sessions } = addProjectWithSessions(3);
+    appState.setActiveSession(project.id, sessions[0].id);
+    appState.toggleSwarm();
+    expect(appState.activeProject!.layout.splitPanes[0]).toBe(sessions[0].id);
   });
 });
 

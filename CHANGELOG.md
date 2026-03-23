@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.10] - 2026-03-23
+
+### Features
+- Per-hook status breakdown to preferences setup section
+- MCP server management to config sections sidebar
+- Session bookmark feature to history panel
+- Setup section and GitHub links to preferences modal
+- Settings guard for Claude Code statusLine and hooks configuration
+- Right-click context menu for git panel files
+- Files field to package.json for npm publishing
+
+### Fixes
+- Bookmark and delete targeting wrong history entry after /clear
+- History list jumping to top on bookmark or delete
+- Swarm session order not preserved when toggling modes
+- Swarm empty cells persisting after disabling swarm mode
+- Auto session naming extracting prompt text instead of title
+
+### Changes
+- Remove deprecated CLAUDE_CODE_STATUSLINE references
+- Update README to be concise and marketing-focused
+
 ## [0.2.9] - 2026-03-22
 
 ### Fixes

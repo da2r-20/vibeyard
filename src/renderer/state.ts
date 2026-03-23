@@ -72,6 +72,16 @@ class AppState {
             restoreContext(session.id, session.contextWindow);
           }
         }
+        // Migrate duplicate archived session IDs (caused by /clear creating two entries with same id)
+        if (project.sessionHistory) {
+          const seenIds = new Set<string>();
+          for (const entry of project.sessionHistory) {
+            if (seenIds.has(entry.id)) {
+              entry.id = crypto.randomUUID();
+            }
+            seenIds.add(entry.id);
+          }
+        }
       }
     }
     this.emit('state-loaded');
@@ -316,7 +326,7 @@ class AppState {
   private archiveSession(project: ProjectRecord, session: SessionRecord): void {
     const costInfo = getCost(session.id);
     const archived: ArchivedSession = {
-      id: session.id,
+      id: crypto.randomUUID(),
       name: session.name,
       providerId: (session.providerId || 'claude') as ProviderId,
       cliSessionId: session.cliSessionId,

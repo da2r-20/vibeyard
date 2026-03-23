@@ -161,6 +161,38 @@ describe('load()', () => {
     expect(mockRestoreContext).toHaveBeenCalledWith('s1', contextData);
   });
 
+  it('deduplicates history entry IDs on load', async () => {
+    const persisted = {
+      version: 1,
+      projects: [{
+        id: 'p1',
+        name: 'Proj',
+        path: '/proj',
+        sessions: [],
+        activeSessionId: null,
+        layout: { mode: 'tabs' as const, splitPanes: [], splitDirection: 'horizontal' as const },
+        sessionHistory: [
+          { id: 'dup-id', name: 'Entry1', providerId: 'claude', cliSessionId: 'cli-a', createdAt: '2026-01-01', closedAt: '2026-01-01', cost: null },
+          { id: 'dup-id', name: 'Entry2', providerId: 'claude', cliSessionId: 'cli-b', createdAt: '2026-01-02', closedAt: '2026-01-02', cost: null },
+          { id: 'unique-id', name: 'Entry3', providerId: 'claude', cliSessionId: 'cli-c', createdAt: '2026-01-03', closedAt: '2026-01-03', cost: null },
+        ],
+      }],
+      activeProjectId: 'p1',
+      preferences: { soundOnSessionWaiting: false, debugMode: false },
+    };
+    mockLoad.mockResolvedValue(persisted);
+    await appState.load();
+    const history = appState.getSessionHistory('p1');
+    expect(history).toHaveLength(3);
+    // First entry keeps its ID, second gets a new one
+    expect(history[0].id).toBe('dup-id');
+    expect(history[1].id).not.toBe('dup-id');
+    expect(history[2].id).toBe('unique-id');
+    // All IDs are now unique
+    const ids = new Set(history.map(h => h.id));
+    expect(ids.size).toBe(3);
+  });
+
   it('does not call restoreCost for sessions without cost', async () => {
     const persisted = {
       version: 1,
@@ -1069,12 +1101,14 @@ describe('removeHistoryEntry()', () => {
     appState.updateSessionCliId(project.id, s2.id, 'cli-s2');
     appState.removeSession(project.id, s1.id);
     appState.removeSession(project.id, s2.id);
-    expect(appState.getSessionHistory(project.id)).toHaveLength(2);
+    const historyBefore = appState.getSessionHistory(project.id);
+    expect(historyBefore).toHaveLength(2);
 
-    appState.removeHistoryEntry(project.id, s1.id);
+    const entryToRemove = historyBefore.find(h => h.name === 'S1')!;
+    appState.removeHistoryEntry(project.id, entryToRemove.id);
     const history = appState.getSessionHistory(project.id);
     expect(history).toHaveLength(1);
-    expect(history[0].id).toBe(s2.id);
+    expect(history[0].name).toBe('S2');
   });
 
   it('no-op for nonexistent project', () => {
@@ -1153,13 +1187,15 @@ describe('clearSessionHistory()', () => {
     const { project, sessions } = addProjectWithSessions(3);
     sessions.forEach((s, i) => appState.updateSessionCliId(project.id, s.id, `cli-bm-clear-${i}`));
     appState.removeAllSessions(project.id);
-    expect(appState.getSessionHistory(project.id)).toHaveLength(3);
+    const historyBefore = appState.getSessionHistory(project.id);
+    expect(historyBefore).toHaveLength(3);
 
-    appState.toggleBookmark(project.id, sessions[1].id);
+    const entryToBookmark = historyBefore.find(h => h.name === sessions[1].name)!;
+    appState.toggleBookmark(project.id, entryToBookmark.id);
     appState.clearSessionHistory(project.id);
     const remaining = appState.getSessionHistory(project.id);
     expect(remaining).toHaveLength(1);
-    expect(remaining[0].id).toBe(sessions[1].id);
+    expect(remaining[0].name).toBe(sessions[1].name);
     expect(remaining[0].bookmarked).toBe(true);
   });
 });
@@ -1211,6 +1247,26 @@ describe('toggleBookmark()', () => {
   it('no-op for nonexistent entry', () => {
     const project = addProject();
     appState.toggleBookmark(project.id, 'nonexistent');
+  });
+
+  it('archived entries from same session via /clear get unique IDs', () => {
+    const project = addProject();
+    const session = appState.addSession(project.id, 'S1')!;
+    appState.updateSessionCliId(project.id, session.id, 'cli-first');
+    // Simulate /clear: session gets a new CLI session ID, old state is archived
+    appState.updateSessionCliId(project.id, session.id, 'cli-second');
+    // Close the session — archives again with the new CLI session ID
+    appState.removeSession(project.id, session.id);
+    const history = appState.getSessionHistory(project.id);
+    expect(history).toHaveLength(2);
+    // Both entries must have unique IDs
+    expect(history[0].id).not.toBe(history[1].id);
+
+    // Bookmarking each entry should only affect that entry
+    appState.toggleBookmark(project.id, history[1].id);
+    const afterToggle = appState.getSessionHistory(project.id);
+    expect(afterToggle[1].bookmarked).toBe(true);
+    expect(afterToggle[0].bookmarked).toBeFalsy();
   });
 });
 

@@ -30,15 +30,17 @@ function autoScanIfNeeded(): void {
   const project = appState.activeProject;
   if (!project) return;
   if (scanning) return;
-  runScan();
+  // Rescan silently if we already have results to avoid UI flicker
+  runScan(!!project.readiness);
 }
 
-async function runScan(): Promise<void> {
+async function runScan(silent = false): Promise<void> {
   const project = appState.activeProject;
   if (!project || scanning) return;
 
   scanning = true;
-  render();
+  // Only show scanning UI when there's no existing result (or explicitly requested)
+  if (!silent) render();
 
   try {
     const result = await window.vibeyard.readiness.analyze(project.path);

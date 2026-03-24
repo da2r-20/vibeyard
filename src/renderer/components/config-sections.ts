@@ -133,7 +133,11 @@ async function refresh(): Promise<void> {
     return;
   }
 
-  container.innerHTML = '<div class="config-loading">Loading...</div>';
+  // Only show loading indicator on first render (when container is empty)
+  const isFirstLoad = container.children.length === 0;
+  if (isFirstLoad) {
+    container.innerHTML = '<div class="config-loading">Loading...</div>';
+  }
 
   let config: ClaudeConfig;
   try {

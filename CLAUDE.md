@@ -67,6 +67,10 @@ CLI-specific behavior is encapsulated behind a `CliProvider` interface (`src/mai
 
 App state (projects, sessions, layout) persists to `~/.vibeyard/state.json` via the main process store. Saves are debounced and flushed on quit. Sessions track `cliSessionId` for CLI session resume capability. Legacy `claudeSessionId` fields are auto-migrated on load.
 
+## Planning
+
+When entering plan mode for a new feature, consider whether the feature (or aspects of it) should be exposed as a user-configurable option in Preferences. If it's relevant, ask the user whether they'd like it added as a config in the prefs before finalizing the plan.
+
 ## Post-Implementation
 
 After completing an implementation task, always:

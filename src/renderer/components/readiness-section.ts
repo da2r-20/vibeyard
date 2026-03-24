@@ -30,14 +30,7 @@ function autoScanIfNeeded(): void {
   const project = appState.activeProject;
   if (!project) return;
   if (scanning) return;
-
-  // Auto-scan if never scanned
-  if (!project.readiness) {
-    runScan();
-    return;
-  }
-
-  // Show stale indicator but don't auto-rescan
+  runScan();
 }
 
 async function runScan(): Promise<void> {

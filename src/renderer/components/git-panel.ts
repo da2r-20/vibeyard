@@ -39,6 +39,11 @@ function createSeparator(): HTMLElement {
   return sep;
 }
 
+function afterAction(): void {
+  lastFilesKey = '';
+  scheduleRefresh();
+}
+
 function showGitFileContextMenu(x: number, y: number, entry: GitFileEntry, gitPath: string): void {
   hideGitContextMenu();
 
@@ -46,11 +51,6 @@ function showGitFileContextMenu(x: number, y: number, entry: GitFileEntry, gitPa
   menu.className = 'tab-context-menu';
   menu.style.left = `${x}px`;
   menu.style.top = `${y}px`;
-
-  const afterAction = () => {
-    lastFilesKey = '';
-    scheduleRefresh();
-  };
 
   if (entry.area === 'staged') {
     menu.appendChild(createMenuItem('Unstage', async () => {
@@ -108,6 +108,18 @@ function statusBadge(entry: GitFileEntry): string {
   };
   const letter = letterMap[entry.status] || '?';
   return `<span class="git-file-badge ${entry.status}">${letter}</span>`;
+}
+
+function createActionButton(title: string, icon: string, onClick: (e: Event) => void): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.className = 'git-action-btn';
+  btn.title = title;
+  btn.textContent = icon;
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    onClick(e);
+  });
+  return btn;
 }
 
 function groupLabel(area: string): string {
@@ -327,6 +339,36 @@ async function loadFiles(body: HTMLElement, gitPath: string): Promise<void> {
       const item = document.createElement('div');
       item.className = 'config-item config-item-clickable';
       item.innerHTML = `${statusBadge(entry)}<span class="config-item-detail" title="${esc(entry.path)}">${esc(entry.path)}</span>`;
+
+      // Hover action buttons
+      const actions = document.createElement('span');
+      actions.className = 'git-item-actions';
+
+      if (entry.area === 'staged') {
+        actions.appendChild(createActionButton('Unstage', '−', async () => {
+          await window.vibeyard.git.unstageFile(gitPath, entry.path);
+          afterAction();
+        }));
+      } else {
+        if (entry.area !== 'conflicted') {
+          actions.appendChild(createActionButton('Discard Changes', '↩', async () => {
+            const msg = entry.area === 'untracked'
+              ? `Delete untracked file "${entry.path}"?`
+              : `Discard changes to "${entry.path}"? This cannot be undone.`;
+            if (confirm(msg)) {
+              await window.vibeyard.git.discardFile(gitPath, entry.path, entry.area);
+              afterAction();
+            }
+          }));
+        }
+        actions.appendChild(createActionButton('Stage', '+', async () => {
+          await window.vibeyard.git.stageFile(gitPath, entry.path);
+          afterAction();
+        }));
+      }
+
+      item.appendChild(actions);
+
       item.addEventListener('click', () => showFileViewer(entry.path, entry.area, gitPath));
       item.addEventListener('contextmenu', (e) => {
         e.preventDefault();

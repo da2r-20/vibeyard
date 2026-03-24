@@ -39,7 +39,7 @@ describe('aiInstructionsChecker', () => {
     expect(result.id).toBe('ai-instructions');
     expect(result.weight).toBe(0.5);
     expect(result.score).toBe(0);
-    expect(result.checks).toHaveLength(8);
+    expect(result.checks).toHaveLength(5);
     expect(result.checks.every(c => c.status === 'fail')).toBe(true);
   });
 
@@ -107,36 +107,22 @@ describe('aiInstructionsChecker', () => {
     expect(check.score).toBe(0);
   });
 
-  it('provides fix prompts for file existence checks', async () => {
+  it('provides fix prompt for claude-md-exists check', async () => {
     mockFs.statSync.mockImplementation(() => { throw new Error('ENOENT'); });
     mockFs.readFileSync.mockImplementation(() => { throw new Error('ENOENT'); });
 
     const result = await aiInstructionsChecker.analyze('/test/project');
-    // File existence checks (not dependent on CLAUDE.md content) should have fix prompts
-    const fileChecks = ['claude-md-exists', 'cursor-rules', 'agents-md', 'copilot-instructions'];
-    for (const id of fileChecks) {
-      const check = result.checks.find(c => c.id === id)!;
-      expect(check.status).toBe('fail');
-      expect(check.fixPrompt).toBeTruthy();
-    }
-  });
-
-  it('detects .cursorrules file', async () => {
-    mockFileExists({ '.cursorrules': 'rules here' });
-
-    const result = await aiInstructionsChecker.analyze('/test/project');
-    const check = result.checks.find(c => c.id === 'cursor-rules')!;
-    expect(check.status).toBe('pass');
+    const check = result.checks.find(c => c.id === 'claude-md-exists')!;
+    expect(check.status).toBe('fail');
+    expect(check.fixPrompt).toBeTruthy();
   });
 
   it('calculates weighted score correctly', async () => {
-    // 5 checks based on CLAUDE.md content pass, 3 file existence checks fail
     const content = Array(100).fill('line').join('\n') + '\nbuild\ntest\narchitecture\n';
     mockFileExists({ 'CLAUDE.md': content });
 
     const result = await aiInstructionsChecker.analyze('/test/project');
-    // CLAUDE.md exists: pass(100), build: pass(100), test: pass(100), architecture: pass(100), size: pass(100)
-    // cursorrules: fail(0), agents.md: fail(0), copilot: fail(0)
-    expect(result.score).toBe(63); // 500/800 = 62.5, rounded to 63
+    // All 5 checks pass: exists(100), build(100), test(100), architecture(100), size(100)
+    expect(result.score).toBe(100);
   });
 });

@@ -1,7 +1,7 @@
 import * as path from 'path';
 import type { ReadinessCategory, ReadinessCheck } from '../../../shared/types';
 import type { ReadinessChecker } from '../types';
-import { fileExists, dirExists, readFileSafe, buildCategory } from '../utils';
+import { fileExists, readFileSafe, buildCategory } from '../utils';
 
 function checkClaudeMdExists(projectPath: string): ReadinessCheck {
   const exists = fileExists(path.join(projectPath, 'CLAUDE.md'));
@@ -137,47 +137,6 @@ function checkClaudeMdSize(content: string | null): ReadinessCheck {
   };
 }
 
-function checkCursorRules(projectPath: string): ReadinessCheck {
-  const hasFile = fileExists(path.join(projectPath, '.cursorrules'));
-  const hasDir = dirExists(path.join(projectPath, '.cursor', 'rules'));
-  const exists = hasFile || hasDir;
-  return {
-    id: 'cursor-rules',
-    name: '.cursorrules or .cursor/rules/',
-    status: exists ? 'pass' : 'fail',
-    description: exists ? 'Cursor rules found' : 'No .cursorrules file or .cursor/rules/ directory found.',
-    score: exists ? 100 : 0,
-    maxScore: 100,
-    fixPrompt: exists ? undefined : 'Create a .cursorrules file for this project. Analyze the codebase and create rules that guide Cursor AI about project conventions, preferred patterns, and things to avoid.',
-  };
-}
-
-function checkAgentsMd(projectPath: string): ReadinessCheck {
-  const exists = fileExists(path.join(projectPath, 'AGENTS.md'));
-  return {
-    id: 'agents-md',
-    name: 'AGENTS.md',
-    status: exists ? 'pass' : 'fail',
-    description: exists ? 'AGENTS.md found' : 'No AGENTS.md file found.',
-    score: exists ? 100 : 0,
-    maxScore: 100,
-    fixPrompt: exists ? undefined : 'Create an AGENTS.md file for this project. This file guides AI coding agents about project-specific workflows, testing requirements, and code review standards.',
-  };
-}
-
-function checkCopilotInstructions(projectPath: string): ReadinessCheck {
-  const exists = fileExists(path.join(projectPath, '.github', 'copilot-instructions.md'));
-  return {
-    id: 'copilot-instructions',
-    name: '.github/copilot-instructions.md',
-    status: exists ? 'pass' : 'fail',
-    description: exists ? 'Copilot instructions found' : 'No .github/copilot-instructions.md file found.',
-    score: exists ? 100 : 0,
-    maxScore: 100,
-    fixPrompt: exists ? undefined : 'Create a .github/copilot-instructions.md file for this project. This file provides GitHub Copilot with project-specific context and coding guidelines.',
-  };
-}
-
 export const aiInstructionsChecker: ReadinessChecker = {
   id: 'ai-instructions',
   name: 'AI Instructions',
@@ -192,9 +151,6 @@ export const aiInstructionsChecker: ReadinessChecker = {
       checkClaudeMdTestCommands(claudeMdContent),
       checkClaudeMdArchitecture(claudeMdContent),
       checkClaudeMdSize(claudeMdContent),
-      checkCursorRules(projectPath),
-      checkAgentsMd(projectPath),
-      checkCopilotInstructions(projectPath),
     ];
 
     return buildCategory(this.id, this.name, this.weight, checks);

@@ -115,6 +115,9 @@ export interface VibeyardApi {
     reinstall(providerId?: ProviderId): Promise<{ success: boolean }>;
     validate(providerId?: ProviderId): Promise<SettingsValidationResult>;
   };
+  clipboard: {
+    write(text: string): Promise<void>;
+  };
   zoom: {
     set(factor: number): void;
   };
@@ -270,6 +273,9 @@ const api: VibeyardApi = {
     respondConflictDialog: (choice) => ipcRenderer.send('settings:conflictDialogResponse', choice),
     reinstall: (providerId) => ipcRenderer.invoke('settings:reinstall', providerId || 'claude'),
     validate: (providerId) => ipcRenderer.invoke('settings:validate', providerId || 'claude'),
+  },
+  clipboard: {
+    write: (text: string) => ipcRenderer.invoke('clipboard:write', text),
   },
   zoom: {
     set: (factor: number) => {

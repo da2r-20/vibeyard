@@ -161,6 +161,7 @@ export interface Preferences {
   // the consent decision. Used to detect new conflicts (different command)
   // vs the previously-acknowledged one.
   statusLineConsentCommand?: string | null;
+  copyOnSelect?: boolean;
   keybindings?: Record<string, string>;
   theme?: 'dark' | 'light';
   readinessExcludedProviders?: ProviderId[];

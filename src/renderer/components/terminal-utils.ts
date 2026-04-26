@@ -11,7 +11,7 @@ export function attachCopyOnSelect(terminal: Terminal): void {
   terminal.onSelectionChange(() => {
     if (!appState.preferences.copyOnSelect) return;
     const selection = terminal.getSelection();
-    if (selection) window.vibeyard.clipboard.write(selection);
+    if (selection) window.vibeyard.clipboard.write(selection).catch(() => {});
   });
 }
 

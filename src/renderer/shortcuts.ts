@@ -50,6 +50,7 @@ export const SHORTCUT_DEFAULTS: ShortcutDefault[] = [
   { id: 'zoom-in', label: 'Zoom In', category: 'View', defaultKeys: 'CmdOrCtrl+=' },
   { id: 'zoom-out', label: 'Zoom Out', category: 'View', defaultKeys: 'CmdOrCtrl+-' },
   { id: 'zoom-reset', label: 'Reset Zoom', category: 'View', defaultKeys: 'CmdOrCtrl+0' },
+  { id: 'paste', label: 'Paste', category: 'Editing', defaultKeys: 'CmdOrCtrl+V' },
 ];
 
 /** Convert accelerator string to platform-specific display string */

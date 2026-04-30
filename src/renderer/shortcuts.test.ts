@@ -451,3 +451,31 @@ describe('shortcutManager singleton', () => {
     expect(shortcutManager).toBeInstanceOf(ShortcutManager);
   });
 });
+
+describe('paste shortcut', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubGlobal('navigator', { platform: 'Linux x86_64' });
+    mockAppState.preferences.keybindings = {};
+  });
+
+  it('paste shortcut is present in SHORTCUT_DEFAULTS with default CmdOrCtrl+V', async () => {
+    const { SHORTCUT_DEFAULTS } = await import('./shortcuts');
+    const paste = SHORTCUT_DEFAULTS.find((s) => s.id === 'paste');
+    expect(paste).toBeDefined();
+    expect(paste!.defaultKeys).toBe('CmdOrCtrl+V');
+    expect(paste!.label).toBe('Paste');
+    expect(paste!.category).toBe('Editing');
+  });
+
+  it('shortcutManager.getKeys returns default for paste when no override', async () => {
+    const { shortcutManager } = await import('./shortcuts');
+    expect(shortcutManager.getKeys('paste')).toBe('CmdOrCtrl+V');
+  });
+
+  it('shortcutManager.getKeys returns override for paste when set', async () => {
+    mockAppState.preferences.keybindings = { paste: 'CmdOrCtrl+Shift+V' };
+    const { shortcutManager } = await import('./shortcuts');
+    expect(shortcutManager.getKeys('paste')).toBe('CmdOrCtrl+Shift+V');
+  });
+});

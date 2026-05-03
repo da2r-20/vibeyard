@@ -88,6 +88,11 @@ export interface VibeyardApi {
   clipboard: {
     write(text: string): Promise<void>;
   };
+  paste: {
+    setAccelerator(accelerator: string): Promise<void>;
+    native(): Promise<void>;
+    onDispatch(callback: () => void): () => void;
+  };
   menu: {
     onNewProject(callback: () => void): () => void;
     onNewSession(callback: () => void): () => void;

@@ -233,7 +233,7 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('paste:native', () => {
     const win = BrowserWindow.getFocusedWindow();
-    win?.webContents.paste();
+    if (win && !win.isDestroyed()) win.webContents.paste();
   });
 
   ipcMain.handle('clipboard:write', (_event, text: string) => {

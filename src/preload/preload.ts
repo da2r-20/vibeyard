@@ -120,6 +120,11 @@ export interface VibeyardApi {
   clipboard: {
     write(text: string): Promise<void>;
   };
+  paste: {
+    setAccelerator(accelerator: string): Promise<void>;
+    native(): Promise<void>;
+    onDispatch(callback: () => void): () => void;
+  };
   zoom: {
     set(factor: number): void;
   };
@@ -281,6 +286,11 @@ const api: VibeyardApi = {
   },
   clipboard: {
     write: (text: string) => ipcRenderer.invoke('clipboard:write', text),
+  },
+  paste: {
+    setAccelerator: (accelerator: string) => ipcRenderer.invoke('paste:set-accelerator', accelerator),
+    native: () => ipcRenderer.invoke('paste:native'),
+    onDispatch: (callback) => onChannel('paste:dispatch', () => callback()),
   },
   zoom: {
     set: (factor: number) => {

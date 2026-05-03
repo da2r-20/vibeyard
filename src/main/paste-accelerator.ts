@@ -89,8 +89,13 @@ export function getPasteAccelerator(): string {
   return currentAccelerator;
 }
 
+/**
+ * Install the paste accelerator listener on the given window's webContents.
+ * Idempotent: subsequent calls are no-ops, even with a different window
+ * (the app is single-main-window). Pre-existing listener stays attached.
+ */
 export function installPasteListener(window: BrowserWindow): void {
-  if (listenerInstalled && installedWindow === window) return;
+  if (listenerInstalled) return;
   listenerInstalled = true;
   installedWindow = window;
 

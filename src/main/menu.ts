@@ -1,5 +1,6 @@
 import { app, Menu, BrowserWindow } from 'electron';
 import { isMac, isWin } from './platform';
+import { getPasteAccelerator } from './paste-accelerator';
 
 export function createAppMenu(debugMode = false): void {
 
@@ -53,7 +54,12 @@ export function createAppMenu(debugMode = false): void {
         { type: 'separator' as const },
         { label: 'Cut', click: () => focusedContents()?.cut() },
         { label: 'Copy', click: () => focusedContents()?.copy() },
-        { label: 'Paste', click: () => focusedContents()?.paste() },
+        {
+          label: 'Paste',
+          accelerator: getPasteAccelerator(),
+          registerAccelerator: false,
+          click: () => focusedContents()?.paste(),
+        },
         { label: 'Delete', click: () => focusedContents()?.delete() },
         { label: 'Select All', click: () => focusedContents()?.selectAll() },
       ] : [
@@ -62,7 +68,12 @@ export function createAppMenu(debugMode = false): void {
         { type: 'separator' as const },
         { role: 'cut' as const },
         { role: 'copy' as const },
-        { role: 'paste' as const },
+        {
+          label: 'Paste',
+          accelerator: getPasteAccelerator(),
+          registerAccelerator: false,
+          click: () => focusedContents()?.paste(),
+        },
         { role: 'pasteAndMatchStyle' as const },
         { role: 'delete' as const },
         { role: 'selectAll' as const },

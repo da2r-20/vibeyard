@@ -84,7 +84,7 @@ function createShell(projectId: string): ShellTerminalInstance {
   const shellId = crypto.randomUUID();
   const sessionId = `shell-${projectId}-${shellId}`;
 
-  attachClipboardCopyHandler(terminal, undefined, (data) => window.vibeyard.pty.write(sessionId, data));
+  attachClipboardCopyHandler(terminal);
 
   const instance: ShellTerminalInstance = {
     id: shellId,

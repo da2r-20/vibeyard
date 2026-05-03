@@ -20,18 +20,13 @@ export function attachCopyOnSelect(terminal: Terminal): void {
  * - Cmd/Ctrl+F: bubbles up to document (prevents xterm from consuming it)
  * - Ctrl+Shift+C: copies selected text to clipboard
  * - Windows Ctrl+C: copies if selection exists, otherwise passes through as SIGINT
- * - Windows Ctrl+V: pastes clipboard content to PTY (requires writeToPty)
  *
  * Pass an optional `extend` handler for terminal-specific key behavior.
  * Return false to suppress the key, undefined to fall through to default.
- *
- * Pass `writeToPty` to enable Ctrl+V paste on Windows — it receives the
- * clipboard text and should forward it to the PTY.
  */
 export function attachClipboardCopyHandler(
   terminal: Terminal,
   extend?: ExtraKeyHandler,
-  writeToPty?: (data: string) => void
 ): void {
   terminal.attachCustomKeyEventHandler((e) => {
     // Cmd/Ctrl+F: bubble to document for search
@@ -54,21 +49,6 @@ export function attachClipboardCopyHandler(
         return false;
       }
       return true; // no selection — let xterm send \x03
-    }
-
-    // Windows: Ctrl+V → async paste clipboard to PTY
-    if (isWin && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key === 'v' && writeToPty) {
-      if (e.type === 'keydown') {
-        navigator.clipboard.readText().then((text) => {
-          if (!text) return;
-          // Respect bracketed paste mode if the shell enabled it
-          const modes = (terminal as any).modes;
-          const bp = modes?.bracketedPasteMode;
-          writeToPty(bp ? `\x1b[200~${text}\x1b[201~` : text);
-        }).catch(() => {});
-      }
-      e.preventDefault(); // prevent native paste event from firing
-      return false; // suppress \x16
     }
 
     // Let registered app shortcuts bubble to document listener

@@ -99,8 +99,6 @@ export function createTerminalPane(
     }
   }));
 
-  const writeToPty = (data: string) => window.vibeyard.pty.write(sessionId, data);
-
   // Send CSI u encoding for Shift+Enter so Claude CLI treats it as newline
   attachClipboardCopyHandler(terminal, (e) => {
     if (e.shiftKey && e.key === 'Enter') {
@@ -108,7 +106,7 @@ export function createTerminalPane(
       e.preventDefault();
       return false;
     }
-  }, writeToPty);
+  });
 
   const instance: TerminalInstance = {
     terminal,
@@ -316,6 +314,23 @@ export function setFocused(sessionId: string): void {
       instance.element.classList.remove('focused');
     }
   }
+}
+
+/** Returns true if any text was sent to the focused session's PTY. */
+export function writeToFocusedTerminal(data: string): boolean {
+  if (!focusedSessionId) return false;
+  if (!data) return false;
+  window.vibeyard.pty.write(focusedSessionId, data);
+  return true;
+}
+
+/** Returns whether the focused terminal currently has bracketed-paste mode enabled. */
+export function getFocusedTerminalBracketedPaste(): boolean {
+  if (!focusedSessionId) return false;
+  const instance = instances.get(focusedSessionId);
+  if (!instance) return false;
+  const modes = (instance.terminal as { modes?: { bracketedPasteMode?: boolean } }).modes;
+  return !!modes?.bracketedPasteMode;
 }
 
 export function handlePtyData(sessionId: string, data: string): void {

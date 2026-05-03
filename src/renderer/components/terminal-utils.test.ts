@@ -41,14 +41,12 @@ vi.mock('@xterm/addon-webgl', () => ({
 import { attachClipboardCopyHandler, attachCopyOnSelect, loadWebglWithFallback } from './terminal-utils.js';
 
 const mockClipboardWrite = vi.fn().mockResolvedValue(undefined);
-const mockClipboardRead = vi.fn();
 const mockVibeyardClipboardWrite = vi.fn().mockResolvedValue(undefined);
 
 class FakeTerminal {
   private keyHandler: ((e: KeyboardEvent) => boolean) | null = null;
   private selectionListener: (() => void) | null = null;
   private _selection = '';
-  modes = { bracketedPasteMode: false };
 
   attachCustomKeyEventHandler(handler: (e: KeyboardEvent) => boolean): void {
     this.keyHandler = handler;
@@ -68,13 +66,12 @@ class FakeTerminal {
 function stubPlatform(platform: string) {
   vi.stubGlobal('navigator', {
     platform,
-    clipboard: { writeText: mockClipboardWrite, readText: mockClipboardRead },
+    clipboard: { writeText: mockClipboardWrite },
   });
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockClipboardRead.mockResolvedValue('');
   mockMatchesAnyShortcut.mockReturnValue(false);
   mockPreferences.copyOnSelect = false;
   vi.stubGlobal('window', { vibeyard: { clipboard: { write: mockVibeyardClipboardWrite } } });
@@ -174,16 +171,6 @@ describe('attachClipboardCopyHandler (macOS)', () => {
     expect(mockClipboardWrite).not.toHaveBeenCalled();
   });
 
-  it('does not intercept Ctrl+V (lets xterm send control char)', () => {
-    const terminal = new FakeTerminal();
-    const writeToPty = vi.fn();
-    attachClipboardCopyHandler(terminal as any, undefined, writeToPty);
-
-    const result = terminal.simulateKey({ ctrlKey: true, key: 'v', type: 'keydown' });
-
-    expect(result).toBe(true);
-    expect(writeToPty).not.toHaveBeenCalled();
-  });
 });
 
 describe('attachClipboardCopyHandler (Windows)', () => {
@@ -224,75 +211,6 @@ describe('attachClipboardCopyHandler (Windows)', () => {
 
     expect(result).toBe(false);
     expect(mockClipboardWrite).not.toHaveBeenCalled();
-  });
-
-  it('Ctrl+V returns false and pastes clipboard to PTY', async () => {
-    const terminal = new FakeTerminal();
-    const writeToPty = vi.fn();
-    mockClipboardRead.mockResolvedValue('pasted text');
-    attachClipboardCopyHandler(terminal as any, undefined, writeToPty);
-
-    const result = terminal.simulateKey({ ctrlKey: true, key: 'v', type: 'keydown', preventDefault: vi.fn() });
-
-    expect(result).toBe(false);
-    await vi.waitFor(() => expect(writeToPty).toHaveBeenCalledWith('pasted text'));
-  });
-
-  it('Ctrl+V calls preventDefault to suppress native paste event', () => {
-    const terminal = new FakeTerminal();
-    const writeToPty = vi.fn();
-    const preventDefault = vi.fn();
-    mockClipboardRead.mockResolvedValue('text');
-    attachClipboardCopyHandler(terminal as any, undefined, writeToPty);
-
-    terminal.simulateKey({ ctrlKey: true, key: 'v', type: 'keydown', preventDefault });
-
-    expect(preventDefault).toHaveBeenCalled();
-  });
-
-  it('Ctrl+V wraps text in bracketed paste escapes when mode is enabled', async () => {
-    const terminal = new FakeTerminal();
-    terminal.modes.bracketedPasteMode = true;
-    const writeToPty = vi.fn();
-    mockClipboardRead.mockResolvedValue('pasted');
-    attachClipboardCopyHandler(terminal as any, undefined, writeToPty);
-
-    terminal.simulateKey({ ctrlKey: true, key: 'v', type: 'keydown', preventDefault: vi.fn() });
-
-    await vi.waitFor(() => expect(writeToPty).toHaveBeenCalledWith('\x1b[200~pasted\x1b[201~'));
-  });
-
-  it('Ctrl+V does not paste empty clipboard', async () => {
-    const terminal = new FakeTerminal();
-    const writeToPty = vi.fn();
-    mockClipboardRead.mockResolvedValue('');
-    attachClipboardCopyHandler(terminal as any, undefined, writeToPty);
-
-    terminal.simulateKey({ ctrlKey: true, key: 'v', type: 'keydown', preventDefault: vi.fn() });
-
-    await Promise.resolve();
-    expect(writeToPty).not.toHaveBeenCalled();
-  });
-
-  it('Ctrl+V without writeToPty falls through to default', () => {
-    const terminal = new FakeTerminal();
-    attachClipboardCopyHandler(terminal as any);
-
-    const result = terminal.simulateKey({ ctrlKey: true, key: 'v', type: 'keydown' });
-
-    expect(result).toBe(true);
-  });
-
-  it('Ctrl+V does not call writeToPty on keyup', async () => {
-    const terminal = new FakeTerminal();
-    const writeToPty = vi.fn();
-    mockClipboardRead.mockResolvedValue('text');
-    attachClipboardCopyHandler(terminal as any, undefined, writeToPty);
-
-    terminal.simulateKey({ ctrlKey: true, key: 'v', type: 'keyup', preventDefault: vi.fn() });
-
-    await Promise.resolve();
-    expect(writeToPty).not.toHaveBeenCalled();
   });
 
   it('Ctrl+Shift+C still works for copy', () => {

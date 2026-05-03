@@ -41,6 +41,9 @@ import { initBoard } from './components/board/board-view.js';
 import { initBoardSessionSync } from './board-session-sync.js';
 import { getZoomFactor } from './zoom.js';
 import { confirmAppClose } from './session-close.js';
+import { createPasteDispatcher } from './paste-dispatcher.js';
+import { shortcutManager } from './shortcuts.js';
+import { writeToFocusedTerminal, getFocusedTerminalBracketedPaste } from './components/terminal-pane.js';
 
 let isQuitting = false;
 window.vibeyard.app.onQuitting(() => {
@@ -206,6 +209,16 @@ async function main(): Promise<void> {
   // Load persisted state
   await appState.load();
 
+  const dispatchPaste = createPasteDispatcher({
+    writeToFocusedTerminal,
+    isFocusedTerminalBracketedPaste: getFocusedTerminalBracketedPaste,
+    pasteNative: () => { window.vibeyard.paste.native().catch(() => {}); },
+  });
+  window.vibeyard.paste.onDispatch(() => { dispatchPaste().catch(() => {}); });
+
+  const initialPasteAccel = shortcutManager.getKeys('paste') || 'CmdOrCtrl+V';
+  await window.vibeyard.paste.setAccelerator(initialPasteAccel);
+
   // Apply theme from loaded preferences
   const initialTheme = appState.preferences.theme ?? 'dark';
   document.documentElement.dataset.theme = initialTheme;
@@ -217,6 +230,9 @@ async function main(): Promise<void> {
     applyThemeToAllTerminals(theme);
     applyThemeToAllShells(theme);
     applyThemeToAllRemoteTerminals(theme);
+    const pasteAccel = shortcutManager.getKeys('paste') || 'CmdOrCtrl+V';
+    window.vibeyard.paste.setAccelerator(pasteAccel).catch(() => {});
+    window.vibeyard.menu.rebuild(appState.preferences.debugMode ?? false).catch(() => {});
   });
   const savedZoom = getZoomFactor();
   if (savedZoom !== 1.0) window.vibeyard.zoom.set(savedZoom);

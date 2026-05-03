@@ -104,5 +104,6 @@ export interface VibeyardApi {
     onUsageStats(callback: () => void): () => void;
     onToggleInspector(callback: () => void): () => void;
     onCloseSession(callback: () => void): () => void;
+    rebuild(debugMode: boolean): Promise<void>;
   };
 }

@@ -4,6 +4,7 @@ import { registerIpcHandlers, resetHookWatcher } from './ipc-handlers';
 import { killAllPtys } from './pty-manager';
 import { flushState, loadState } from './store';
 import { createAppMenu } from './menu';
+import { installPasteListener } from './paste-accelerator';
 import { restartAndResync } from './hook-status';
 import { initProviders, getAllProviders } from './providers/registry';
 import { initAutoUpdater } from './auto-updater';
@@ -73,6 +74,8 @@ function createWindow(): void {
     resetHookWatcher();
     mainWindow = null;
   });
+
+  installPasteListener(mainWindow);
 }
 
 app.whenReady().then(async () => {

@@ -15,6 +15,7 @@ import { watchFile as watchFileForChanges, unwatchFile as unwatchFileForChanges,
 import { registerMcpHandlers } from './mcp-ipc-handlers';
 import { checkForUpdates, quitAndInstall } from './auto-updater';
 import { createAppMenu } from './menu';
+import { setPasteAccelerator, installPasteListener } from './paste-accelerator';
 import { getProvider, getProviderMeta, getAllProviderMetas } from './providers/registry';
 import { buildHandoffPrompt } from './providers/resume-handoff';
 import { searchSessions } from './session-deep-search';
@@ -222,6 +223,17 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('menu:rebuild', (_event, debugMode: boolean) => {
     createAppMenu(debugMode);
+  });
+
+  ipcMain.handle('paste:set-accelerator', (_event, accelerator: string) => {
+    setPasteAccelerator(accelerator);
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) installPasteListener(win);
+  });
+
+  ipcMain.handle('paste:native', () => {
+    const win = BrowserWindow.getFocusedWindow();
+    win?.webContents.paste();
   });
 
   ipcMain.handle('clipboard:write', (_event, text: string) => {

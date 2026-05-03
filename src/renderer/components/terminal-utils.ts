@@ -26,7 +26,7 @@ export function attachCopyOnSelect(terminal: Terminal): void {
  */
 export function attachClipboardCopyHandler(
   terminal: Terminal,
-  extend?: ExtraKeyHandler,
+  extend?: ExtraKeyHandler
 ): void {
   terminal.attachCustomKeyEventHandler((e) => {
     // Cmd/Ctrl+F: bubble to document for search

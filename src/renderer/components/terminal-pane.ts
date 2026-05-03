@@ -180,11 +180,15 @@ export function setPendingPrompt(sessionId: string, prompt: string): void {
   }
 }
 
+function readBracketedPasteMode(terminal: Terminal): boolean {
+  const modes = (terminal as unknown as { modes?: { bracketedPasteMode?: boolean } }).modes;
+  return !!modes?.bracketedPasteMode;
+}
+
 export function injectPromptIntoRunningSession(sessionId: string, prompt: string): boolean {
   const instance = instances.get(sessionId);
   if (!instance || !instance.spawned || instance.exited) return false;
-  const modes = (instance.terminal as unknown as { modes?: { bracketedPasteMode?: boolean } }).modes;
-  const bp = modes?.bracketedPasteMode;
+  const bp = readBracketedPasteMode(instance.terminal);
   const payload = bp ? `\x1b[200~${prompt}\x1b[201~` : prompt;
   window.vibeyard.pty.write(sessionId, payload);
   window.vibeyard.pty.write(sessionId, '\r');
@@ -318,8 +322,7 @@ export function setFocused(sessionId: string): void {
 
 /** Returns true if any text was sent to the focused session's PTY. */
 export function writeToFocusedTerminal(data: string): boolean {
-  if (!focusedSessionId) return false;
-  if (!data) return false;
+  if (!focusedSessionId || !data) return false;
   window.vibeyard.pty.write(focusedSessionId, data);
   return true;
 }
@@ -329,8 +332,7 @@ export function getFocusedTerminalBracketedPaste(): boolean {
   if (!focusedSessionId) return false;
   const instance = instances.get(focusedSessionId);
   if (!instance) return false;
-  const modes = (instance.terminal as { modes?: { bracketedPasteMode?: boolean } }).modes;
-  return !!modes?.bracketedPasteMode;
+  return readBracketedPasteMode(instance.terminal);
 }
 
 export function handlePtyData(sessionId: string, data: string): void {

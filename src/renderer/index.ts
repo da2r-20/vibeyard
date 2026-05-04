@@ -218,6 +218,7 @@ async function main(): Promise<void> {
 
   const initialPasteAccel = shortcutManager.getKeys('paste') || 'CmdOrCtrl+V';
   await window.vibeyard.paste.setAccelerator(initialPasteAccel);
+  await window.vibeyard.menu.rebuild(appState.preferences.debugMode ?? false);
 
   // Apply theme from loaded preferences
   const initialTheme = appState.preferences.theme ?? 'dark';

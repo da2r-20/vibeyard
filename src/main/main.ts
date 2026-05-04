@@ -4,7 +4,7 @@ import { registerIpcHandlers, resetHookWatcher } from './ipc-handlers';
 import { killAllPtys } from './pty-manager';
 import { flushState, loadState } from './store';
 import { createAppMenu } from './menu';
-import { installPasteListener } from './paste-accelerator';
+import { installPasteListener, resetPasteListener } from './paste-accelerator';
 import { restartAndResync } from './hook-status';
 import { initProviders, getAllProviders } from './providers/registry';
 import { initAutoUpdater } from './auto-updater';
@@ -72,6 +72,7 @@ function createWindow(): void {
   mainWindow.on('closed', () => {
     killAllPtys();
     resetHookWatcher();
+    resetPasteListener();
     mainWindow = null;
   });
 

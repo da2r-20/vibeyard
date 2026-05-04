@@ -2,6 +2,7 @@ import type { BrowserWindow } from 'electron';
 
 export type Platform = NodeJS.Platform;
 
+
 export interface InputLike {
   type: 'keyDown' | 'keyUp' | string;
   key: string;
@@ -79,7 +80,6 @@ export function matchesPasteAccelerator(
 
 let currentAccelerator = 'CmdOrCtrl+V';
 let listenerInstalled = false;
-let installedWindow: BrowserWindow | null = null;
 
 export function setPasteAccelerator(accelerator: string): void {
   currentAccelerator = accelerator || 'CmdOrCtrl+V';
@@ -91,13 +91,13 @@ export function getPasteAccelerator(): string {
 
 /**
  * Install the paste accelerator listener on the given window's webContents.
- * Idempotent: subsequent calls are no-ops, even with a different window
- * (the app is single-main-window). Pre-existing listener stays attached.
+ * Idempotent: subsequent calls are no-ops while a listener is already
+ * installed. Call `resetPasteListener` after the window is destroyed so a
+ * freshly recreated window (e.g. macOS dock-reopen) gets its own listener.
  */
 export function installPasteListener(window: BrowserWindow): void {
   if (listenerInstalled) return;
   listenerInstalled = true;
-  installedWindow = window;
 
   window.webContents.on('before-input-event', (event, input) => {
     if (matchesPasteAccelerator(input as InputLike, currentAccelerator)) {
@@ -107,9 +107,12 @@ export function installPasteListener(window: BrowserWindow): void {
   });
 }
 
+export function resetPasteListener(): void {
+  listenerInstalled = false;
+}
+
 // Test-only: reset module state between tests.
 export function _resetForTesting(): void {
   currentAccelerator = 'CmdOrCtrl+V';
   listenerInstalled = false;
-  installedWindow = null;
 }

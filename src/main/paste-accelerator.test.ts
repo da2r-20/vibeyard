@@ -136,6 +136,19 @@ describe('paste-accelerator stateful API', () => {
     expect(on2).not.toHaveBeenCalled();
   });
 
+  it('after resetPasteListener, installPasteListener attaches to a freshly recreated window', async () => {
+    const { installPasteListener, resetPasteListener } = await import('./paste-accelerator');
+    const on1 = vi.fn();
+    const on2 = vi.fn();
+    const w1 = { webContents: { on: on1, send: vi.fn() } } as unknown as Parameters<typeof installPasteListener>[0];
+    const w2 = { webContents: { on: on2, send: vi.fn() } } as unknown as Parameters<typeof installPasteListener>[0];
+    installPasteListener(w1);
+    resetPasteListener();
+    installPasteListener(w2);
+    expect(on1).toHaveBeenCalledTimes(1);
+    expect(on2).toHaveBeenCalledTimes(1);
+  });
+
   it('on matching keydown the listener prevents default and sends paste:dispatch', async () => {
     const { installPasteListener, setPasteAccelerator } = await import('./paste-accelerator');
     setPasteAccelerator('CmdOrCtrl+V');

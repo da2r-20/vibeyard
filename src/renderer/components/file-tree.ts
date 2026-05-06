@@ -1,4 +1,8 @@
 import { appState, ProjectRecord } from '../state.js';
+import { pathToFileURL } from '../file-url.js';
+import { showContextMenu, MenuOption } from './board/board-context-menu.js';
+import { showConfirmModal } from './modal.js';
+import { FILE_PATH_DRAG_TYPE } from '../drag-types.js';
 
 export interface DirEntry {
   name: string;
@@ -207,13 +211,64 @@ async function renderChildren(
           subContainer.innerHTML = '';
         }
       });
+      row.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showContextMenu(e.clientX, e.clientY, [deleteMenuOption(entry)]);
+      });
     } else {
+      row.draggable = true;
+      row.addEventListener('dragstart', (e) => {
+        if (!e.dataTransfer) return;
+        e.dataTransfer.effectAllowed = 'copy';
+        e.dataTransfer.setData(FILE_PATH_DRAG_TYPE, entry.path);
+        e.dataTransfer.setData('text/plain', entry.path);
+      });
       row.addEventListener('click', (e) => {
         e.stopPropagation();
         appState.addFileReaderSession(projectId, entry.path);
       });
+      row.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showContextMenu(e.clientX, e.clientY, [
+          {
+            label: 'Open in Browser',
+            action: () => {
+              appState.addBrowserTabSession(projectId, pathToFileURL(entry.path));
+            },
+          },
+          deleteMenuOption(entry),
+        ]);
+      });
     }
   }
+}
+
+function deleteMenuOption(entry: DirEntry): MenuOption {
+  return {
+    label: 'Delete',
+    danger: true,
+    action: () => confirmAndTrash(entry),
+  };
+}
+
+function confirmAndTrash(entry: DirEntry): void {
+  const kind = entry.isDirectory ? 'folder' : 'file';
+  const message = entry.isDirectory
+    ? `Move "${entry.name}" and its contents to the Trash?`
+    : `Move "${entry.name}" to the Trash?`;
+  showConfirmModal(
+    `Delete ${kind}`,
+    message,
+    async () => {
+      const result = await window.vibeyard.fs.trashItem(entry.path);
+      if (!result.ok) {
+        console.warn(`Failed to trash ${entry.path}: ${result.error ?? 'unknown error'}`);
+      }
+    },
+    { confirmLabel: 'Delete', danger: true },
+  );
 }
 
 export function renderFileTree(project: ProjectRecord, container: HTMLElement): void {

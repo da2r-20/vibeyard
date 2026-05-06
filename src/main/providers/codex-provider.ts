@@ -9,6 +9,7 @@ import { getCodexConfig } from '../codex-config';
 import { installCodexHooks, validateCodexHooks, cleanupCodexHooks, SESSION_ID_VAR } from '../codex-hooks';
 import { startConfigWatcher as startConfigWatch, stopConfigWatcher as stopConfigWatch } from '../config-watcher';
 import { MAX_INDEX_CHARS_PER_SESSION, TRANSCRIPT_TEXT_SEPARATOR } from './transcript-utils';
+import { writeAgentFile, deleteAgentFile } from './agent-files';
 import type { BrowserWindow } from 'electron';
 
 const CODEX_FILE_RE = /-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i;
@@ -28,6 +29,7 @@ export class CodexProvider implements CliProvider {
       configReading: true,
       shiftEnterNewline: false,
       pendingPromptTrigger: 'startup-arg',
+      systemPromptInjection: true,
     },
     defaultContextWindowSize: 200_000,
   };
@@ -47,8 +49,11 @@ export class CodexProvider implements CliProvider {
     return env;
   }
 
-  buildArgs(opts: { cliSessionId: string | null; isResume: boolean; extraArgs: string; initialPrompt?: string }): string[] {
+  buildArgs(opts: { cliSessionId: string | null; isResume: boolean; extraArgs: string; initialPrompt?: string; systemPrompt?: string }): string[] {
     const args: string[] = [];
+    if (opts.systemPrompt) {
+      args.push('-c', `developer_instructions=${opts.systemPrompt}`);
+    }
     if (opts.isResume && opts.cliSessionId) {
       args.push('resume', opts.cliSessionId);
     } else if (opts.initialPrompt) {
@@ -93,6 +98,18 @@ export class CodexProvider implements CliProvider {
 
   reinstallSettings(): void {
     installCodexHooks();
+  }
+
+  agentsDir(): string {
+    return path.join(os.homedir(), '.codex', 'agents');
+  }
+
+  async installAgent(slug: string, content: string): Promise<{ filePath: string }> {
+    return writeAgentFile(this.agentsDir(), slug, content);
+  }
+
+  async removeAgent(slug: string): Promise<void> {
+    return deleteAgentFile(this.agentsDir(), slug);
   }
 
   getTranscriptPath(cliSessionId: string, _projectPath: string): string | null {

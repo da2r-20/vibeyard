@@ -11,6 +11,7 @@ import { installHooksOnly, installStatusLine, getClaudeConfig } from '../claude-
 import { guardedInstall, validateSettings, reinstallSettings } from '../settings-guard';
 import { resolveBinary, validateBinaryExists } from './resolve-binary';
 import { MAX_INDEX_CHARS_PER_SESSION, TRANSCRIPT_TEXT_SEPARATOR, UUID_RE } from './transcript-utils';
+import { writeAgentFile, deleteAgentFile } from './agent-files';
 
 const binaryCache = { path: null as string | null };
 
@@ -28,6 +29,7 @@ export class ClaudeProvider implements CliProvider {
       shiftEnterNewline: true,
       pendingPromptTrigger: 'startup-arg',
       planModeArg: '--permission-mode plan',
+      systemPromptInjection: true,
     },
     defaultContextWindowSize: 200_000,
   };
@@ -48,7 +50,7 @@ export class ClaudeProvider implements CliProvider {
     return env;
   }
 
-  buildArgs(opts: { cliSessionId: string | null; isResume: boolean; extraArgs: string; initialPrompt?: string }): string[] {
+  buildArgs(opts: { cliSessionId: string | null; isResume: boolean; extraArgs: string; initialPrompt?: string; systemPrompt?: string }): string[] {
     const args: string[] = [];
     if (opts.cliSessionId) {
       if (opts.isResume) {
@@ -56,6 +58,9 @@ export class ClaudeProvider implements CliProvider {
       } else {
         args.push('--session-id', opts.cliSessionId);
       }
+    }
+    if (opts.systemPrompt) {
+      args.push('--append-system-prompt', opts.systemPrompt);
     }
     if (opts.initialPrompt) {
       args.push(opts.initialPrompt);
@@ -169,6 +174,18 @@ export class ClaudeProvider implements CliProvider {
       }
     }
     return { text: texts.join(TRANSCRIPT_TEXT_SEPARATOR), cwd };
+  }
+
+  agentsDir(): string {
+    return path.join(os.homedir(), '.claude', 'agents');
+  }
+
+  async installAgent(slug: string, content: string): Promise<{ filePath: string }> {
+    return writeAgentFile(this.agentsDir(), slug, content);
+  }
+
+  async removeAgent(slug: string): Promise<void> {
+    return deleteAgentFile(this.agentsDir(), slug);
   }
 
   parseCostFromOutput(rawText: string): { totalCostUsd: number } | null {

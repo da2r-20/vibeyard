@@ -9,6 +9,7 @@ import { getGeminiConfig } from '../gemini-config';
 import { installGeminiHooks, validateGeminiHooks, cleanupGeminiHooks, SESSION_ID_VAR } from '../gemini-hooks';
 import { startConfigWatcher as startConfigWatch, stopConfigWatcher as stopConfigWatch } from '../config-watcher';
 import { MAX_INDEX_CHARS_PER_SESSION, TRANSCRIPT_TEXT_SEPARATOR } from './transcript-utils';
+import { writeAgentFile, deleteAgentFile } from './agent-files';
 import type { BrowserWindow } from 'electron';
 
 const binaryCache = { path: null as string | null };
@@ -27,6 +28,7 @@ export class GeminiProvider implements CliProvider {
       shiftEnterNewline: false,
       pendingPromptTrigger: 'startup-arg',
       planModeArg: '--approval-mode=plan',
+      systemPromptInjection: false,
     },
     defaultContextWindowSize: 1_000_000,
   };
@@ -46,7 +48,7 @@ export class GeminiProvider implements CliProvider {
     return env;
   }
 
-  buildArgs(opts: { cliSessionId: string | null; isResume: boolean; extraArgs: string; initialPrompt?: string }): string[] {
+  buildArgs(opts: { cliSessionId: string | null; isResume: boolean; extraArgs: string; initialPrompt?: string; systemPrompt?: string }): string[] {
     const args: string[] = [];
     if (opts.isResume && opts.cliSessionId) {
       args.push('-r', opts.cliSessionId);
@@ -93,6 +95,18 @@ export class GeminiProvider implements CliProvider {
 
   reinstallSettings(): void {
     installGeminiHooks();
+  }
+
+  agentsDir(): string {
+    return path.join(os.homedir(), '.gemini', 'agents');
+  }
+
+  async installAgent(slug: string, content: string): Promise<{ filePath: string }> {
+    return writeAgentFile(this.agentsDir(), slug, content);
+  }
+
+  async removeAgent(slug: string): Promise<void> {
+    return deleteAgentFile(this.agentsDir(), slug);
   }
 
   getTranscriptPath(cliSessionId: string, projectPath: string): string | null {

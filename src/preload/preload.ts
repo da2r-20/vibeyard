@@ -1,12 +1,12 @@
-import { contextBridge, ipcRenderer, webFrame } from 'electron';
-import type { CostData, ProviderId, CliProviderMeta, StatsCache, ReadinessResult, ToolFailureData, SettingsWarningData, SettingsValidationResult, StatusLineConflictData, InspectorEvent, ProviderConfig, ReadFileResult, DeepSearchResult } from '../shared/types';
+import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron';
+import type { CostData, ProviderId, CliProviderMeta, StatsCache, ReadinessResult, ToolFailureData, SettingsWarningData, SettingsValidationResult, StatusLineConflictData, InspectorEvent, ProviderConfig, ReadFileResult, DeepSearchResult, GithubFetchResult, GithubRepo } from '../shared/types';
 import { ZOOM_MIN, ZOOM_MAX } from '../shared/types';
 
 export type { CostData } from '../shared/types';
 
 export interface VibeyardApi {
   pty: {
-    create(sessionId: string, cwd: string, cliSessionId: string | null, isResume: boolean, extraArgs?: string, providerId?: ProviderId, initialPrompt?: string): Promise<void>;
+    create(sessionId: string, cwd: string, cliSessionId: string | null, isResume: boolean, extraArgs?: string, providerId?: ProviderId, initialPrompt?: string, systemPrompt?: string): Promise<void>;
     createShell(sessionId: string, cwd: string): Promise<void>;
     write(sessionId: string, data: string): void;
     resize(sessionId: string, cols: number, rows: number): void;
@@ -36,9 +36,11 @@ export interface VibeyardApi {
     exists(filePath: string): Promise<boolean>;
     readFile(filePath: string): Promise<ReadFileResult>;
     readImage(filePath: string): Promise<{ dataUrl: string } | null>;
+    trashItem(filePath: string): Promise<{ ok: boolean; error?: string }>;
     watchFile(filePath: string): void;
     unwatchFile(filePath: string): void;
     onFileChanged(callback: (filePath: string) => void): () => void;
+    getDroppedFilePath(file: File): string;
   };
   store: {
     load(): Promise<unknown>;
@@ -51,6 +53,8 @@ export interface VibeyardApi {
     checkBinary(providerId?: ProviderId): Promise<boolean>;
     watchProject(providerId: ProviderId, projectPath: string): void;
     onConfigChanged(callback: () => void): () => void;
+    installAgent(slug: string, content: string): Promise<Array<{ providerId: ProviderId; ok: boolean; filePath?: string; error?: string }>>;
+    removeAgent(slug: string): Promise<void>;
   };
   /** @deprecated Use provider namespace instead */
   claude: {
@@ -107,6 +111,12 @@ export interface VibeyardApi {
   readiness: {
     analyze(projectPath: string, excludedProviders?: string[]): Promise<ReadinessResult>;
   };
+  github: {
+    isAvailable(): Promise<boolean>;
+    detectRepo(projectPath: string): Promise<GithubRepo | null>;
+    listPRs(repo: string, state: 'open' | 'closed' | 'all', max: number): Promise<GithubFetchResult>;
+    listIssues(repo: string, state: 'open' | 'closed' | 'all', max: number): Promise<GithubFetchResult>;
+  };
   stats: {
     getCache(): Promise<StatsCache | null>;
   };
@@ -146,8 +156,8 @@ function onChannel(channel: string, callback: (...args: unknown[]) => void): () 
 
 const api: VibeyardApi = {
   pty: {
-    create: (sessionId, cwd, cliSessionId, isResume, extraArgs, providerId, initialPrompt) =>
-      ipcRenderer.invoke('pty:create', sessionId, cwd, cliSessionId, isResume, extraArgs || '', providerId || 'claude', initialPrompt),
+    create: (sessionId, cwd, cliSessionId, isResume, extraArgs, providerId, initialPrompt, systemPrompt) =>
+      ipcRenderer.invoke('pty:create', sessionId, cwd, cliSessionId, isResume, extraArgs || '', providerId || 'claude', initialPrompt, systemPrompt),
     createShell: (sessionId, cwd) =>
       ipcRenderer.invoke('pty:createShell', sessionId, cwd),
     write: (sessionId, data) =>
@@ -198,9 +208,11 @@ const api: VibeyardApi = {
     exists: (filePath: string) => ipcRenderer.invoke('fs:exists', filePath),
     readFile: (filePath: string) => ipcRenderer.invoke('fs:readFile', filePath),
     readImage: (filePath: string) => ipcRenderer.invoke('fs:readImage', filePath),
+    trashItem: (filePath: string) => ipcRenderer.invoke('fs:trashItem', filePath),
     watchFile: (filePath: string) => ipcRenderer.send('fs:watchFile', filePath),
     unwatchFile: (filePath: string) => ipcRenderer.send('fs:unwatchFile', filePath),
     onFileChanged: (callback: (filePath: string) => void) => onChannel('fs:fileChanged', (filePath) => callback(filePath as string)),
+    getDroppedFilePath: (file: File) => webUtils.getPathForFile(file),
   },
   provider: {
     getConfig: (providerId, projectPath) => ipcRenderer.invoke('provider:getConfig', providerId, projectPath),
@@ -209,6 +221,8 @@ const api: VibeyardApi = {
     checkBinary: (providerId) => ipcRenderer.invoke('provider:checkBinary', providerId || 'claude'),
     watchProject: (providerId, projectPath) => ipcRenderer.send('config:watchProject', providerId, projectPath),
     onConfigChanged: (callback) => onChannel('config:changed', callback),
+    installAgent: (slug, content) => ipcRenderer.invoke('provider:installAgent', slug, content),
+    removeAgent: (slug) => ipcRenderer.invoke('provider:removeAgent', slug),
   },
   claude: {
     getConfig: (projectPath) => ipcRenderer.invoke('claude:getConfig', projectPath),
@@ -268,6 +282,12 @@ const api: VibeyardApi = {
   },
   readiness: {
     analyze: (projectPath: string, excludedProviders?: string[]) => ipcRenderer.invoke('readiness:analyze', projectPath, excludedProviders),
+  },
+  github: {
+    isAvailable: () => ipcRenderer.invoke('github:isAvailable'),
+    detectRepo: (projectPath: string) => ipcRenderer.invoke('github:detectRepo', projectPath),
+    listPRs: (repo: string, state: 'open' | 'closed' | 'all', max: number) => ipcRenderer.invoke('github:listPRs', repo, state, max),
+    listIssues: (repo: string, state: 'open' | 'closed' | 'all', max: number) => ipcRenderer.invoke('github:listIssues', repo, state, max),
   },
   stats: {
     getCache: () => ipcRenderer.invoke('stats:getCache'),

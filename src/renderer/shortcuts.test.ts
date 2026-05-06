@@ -452,30 +452,58 @@ describe('shortcutManager singleton', () => {
   });
 });
 
-describe('paste shortcut', () => {
+describe('paste shortcut (Linux)', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.stubGlobal('navigator', { platform: 'Linux x86_64' });
     mockAppState.preferences.keybindings = {};
   });
 
-  it('paste shortcut is present in SHORTCUT_DEFAULTS with default CmdOrCtrl+V', async () => {
+  it('default is Ctrl+Shift+V to match Linux terminal convention', async () => {
     const { SHORTCUT_DEFAULTS } = await import('./shortcuts');
     const paste = SHORTCUT_DEFAULTS.find((s) => s.id === 'paste');
     expect(paste).toBeDefined();
-    expect(paste!.defaultKeys).toBe('CmdOrCtrl+V');
+    expect(paste!.defaultKeys).toBe('Ctrl+Shift+V');
     expect(paste!.label).toBe('Paste');
     expect(paste!.category).toBe('Editing');
   });
 
-  it('shortcutManager.getKeys returns default for paste when no override', async () => {
+  it('shortcutManager.getKeys returns Ctrl+Shift+V for paste when no override', async () => {
     const { shortcutManager } = await import('./shortcuts');
-    expect(shortcutManager.getKeys('paste')).toBe('CmdOrCtrl+V');
+    expect(shortcutManager.getKeys('paste')).toBe('Ctrl+Shift+V');
   });
 
   it('shortcutManager.getKeys returns override for paste when set', async () => {
-    mockAppState.preferences.keybindings = { paste: 'CmdOrCtrl+Shift+V' };
+    mockAppState.preferences.keybindings = { paste: 'CmdOrCtrl+V' };
     const { shortcutManager } = await import('./shortcuts');
-    expect(shortcutManager.getKeys('paste')).toBe('CmdOrCtrl+Shift+V');
+    expect(shortcutManager.getKeys('paste')).toBe('CmdOrCtrl+V');
+  });
+});
+
+describe('paste shortcut (Mac)', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubGlobal('navigator', { platform: 'MacIntel' });
+    mockAppState.preferences.keybindings = {};
+  });
+
+  it('default is CmdOrCtrl+V on macOS', async () => {
+    const { SHORTCUT_DEFAULTS } = await import('./shortcuts');
+    const paste = SHORTCUT_DEFAULTS.find((s) => s.id === 'paste');
+    expect(paste!.defaultKeys).toBe('CmdOrCtrl+V');
+  });
+});
+
+describe('paste shortcut (Windows)', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubGlobal('navigator', { platform: 'Win32' });
+    mockAppState.preferences.keybindings = {};
+  });
+
+  it('default is CmdOrCtrl+V on Windows', async () => {
+    const { SHORTCUT_DEFAULTS } = await import('./shortcuts');
+    const paste = SHORTCUT_DEFAULTS.find((s) => s.id === 'paste');
+    expect(paste!.defaultKeys).toBe('CmdOrCtrl+V');
   });
 });

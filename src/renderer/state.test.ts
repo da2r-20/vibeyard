@@ -519,21 +519,29 @@ describe('reorderProject()', () => {
   });
 
   it('no-op when fromIndex === toIndex', () => {
-    appState.addProject('A', '/a');
-    appState.addProject('B', '/b');
+    const a = appState.addProject('A', '/a');
+    const b = appState.addProject('B', '/b');
+    const cb = vi.fn();
+    appState.on('project-changed', cb);
     mockSave.mockClear();
     appState.reorderProject(1, 1);
     expect(mockSave).not.toHaveBeenCalled();
+    expect(cb).not.toHaveBeenCalled();
+    expect(appState.projects.map((p) => p.id)).toEqual([a.id, b.id]);
   });
 
   it('no-op when index is out of range', () => {
-    appState.addProject('A', '/a');
-    appState.addProject('B', '/b');
+    const a = appState.addProject('A', '/a');
+    const b = appState.addProject('B', '/b');
+    const cb = vi.fn();
+    appState.on('project-changed', cb);
     mockSave.mockClear();
     appState.reorderProject(0, 5);
     appState.reorderProject(-1, 0);
     appState.reorderProject(5, 0);
     expect(mockSave).not.toHaveBeenCalled();
+    expect(cb).not.toHaveBeenCalled();
+    expect(appState.projects.map((p) => p.id)).toEqual([a.id, b.id]);
   });
 
   it('emits project-changed and persists', () => {

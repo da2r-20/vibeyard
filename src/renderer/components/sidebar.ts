@@ -154,7 +154,7 @@ function render(): void {
     });
 
     el.addEventListener('dragstart', (e) => {
-      if (renamingProjectId !== null) {
+      if (renamingProjectId === project.id) {
         e.preventDefault();
         return;
       }
@@ -164,6 +164,7 @@ function render(): void {
     });
 
     el.addEventListener('dragover', (e) => {
+      if (el.classList.contains('dragging')) return;
       e.preventDefault();
       e.dataTransfer!.dropEffect = 'move';
       const rect = el.getBoundingClientRect();

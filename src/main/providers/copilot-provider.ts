@@ -6,10 +6,11 @@ import type { CliProvider, TranscriptDescriptor } from './provider';
 import type { CliProviderMeta, ProviderConfig, SettingsValidationResult } from '../../shared/types';
 import { getFullPath } from '../pty-manager';
 import { resolveBinary, validateBinaryExists } from './resolve-binary';
-import { getCopilotConfig } from '../copilot-config';
+import { getCopilotConfig, AGENT_EXT } from '../copilot-config';
 import { installCopilotHooks, validateCopilotHooks, cleanupCopilotHooks, SESSION_ID_VAR } from '../copilot-hooks';
 import { startConfigWatcher as startConfigWatch, stopConfigWatcher as stopConfigWatch } from '../config-watcher';
 import { MAX_INDEX_CHARS_PER_SESSION, TRANSCRIPT_TEXT_SEPARATOR, UUID_RE } from './transcript-utils';
+import { writeAgentFile, deleteAgentFile } from './agent-files';
 
 const binaryCache = { path: null as string | null };
 
@@ -27,6 +28,7 @@ export class CopilotProvider implements CliProvider {
       shiftEnterNewline: false,
       pendingPromptTrigger: 'startup-arg',
       planModeArg: '--mode plan',
+      systemPromptInjection: false,
     },
     defaultContextWindowSize: 128_000,
   };
@@ -46,7 +48,7 @@ export class CopilotProvider implements CliProvider {
     return env;
   }
 
-  buildArgs(opts: { cliSessionId: string | null; isResume: boolean; extraArgs: string; initialPrompt?: string }): string[] {
+  buildArgs(opts: { cliSessionId: string | null; isResume: boolean; extraArgs: string; initialPrompt?: string; systemPrompt?: string }): string[] {
     const args: string[] = [];
     if (opts.isResume && opts.cliSessionId) {
       args.push(`--resume=${opts.cliSessionId}`);
@@ -92,6 +94,18 @@ export class CopilotProvider implements CliProvider {
 
   reinstallSettings(): void {
     installCopilotHooks();
+  }
+
+  agentsDir(): string {
+    return path.join(os.homedir(), '.copilot', 'agents');
+  }
+
+  async installAgent(slug: string, content: string): Promise<{ filePath: string }> {
+    return writeAgentFile(this.agentsDir(), slug, content, AGENT_EXT);
+  }
+
+  async removeAgent(slug: string): Promise<void> {
+    return deleteAgentFile(this.agentsDir(), slug, AGENT_EXT);
   }
 
   getTranscriptPath(cliSessionId: string, _projectPath: string): string | null {

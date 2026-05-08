@@ -16,11 +16,12 @@ import { registerMcpHandlers } from './mcp-ipc-handlers';
 import { checkForUpdates, quitAndInstall } from './auto-updater';
 import { createAppMenu } from './menu';
 import { setPasteAccelerator, installPasteListener } from './paste-accelerator';
-import { getProvider, getProviderMeta, getAllProviderMetas } from './providers/registry';
+import { getProvider, getProviderMeta, getAllProviderMetas, getAllProviders } from './providers/registry';
 import { buildHandoffPrompt } from './providers/resume-handoff';
 import { searchSessions } from './session-deep-search';
 import type { ProviderId, GitFileEntry, SettingsValidationResult, ReadFileResult } from '../shared/types';
 import { analyzeReadiness } from './readiness/analyzer';
+import { isGhAvailable, listPullRequests, listIssues, detectRepo } from './github-cli';
 import { expandUserPath, isBinaryBuffer, BINARY_SNIFF_BYTES } from './fs-utils';
 import { isMac, isWin } from './platform';
 import { shouldWarnStatusLine } from './settings-guard';
@@ -51,6 +52,8 @@ function isAllowedReadPath(resolvedPath: string): boolean {
     path.join(home, '.mcp.json'),
     path.join(home, '.claude') + path.sep,
     path.join(home, '.codex') + path.sep,
+    path.join(home, '.gemini') + path.sep,
+    path.join(home, '.copilot') + path.sep,
   ];
 
   if (isMac) {
@@ -71,7 +74,7 @@ export function resetHookWatcher(): void {
 }
 
 export function registerIpcHandlers(): void {
-  ipcMain.handle('pty:create', async (_event, sessionId: string, cwd: string, cliSessionId: string | null, isResume: boolean, extraArgs: string, providerId: ProviderId = 'claude', initialPrompt?: string) => {
+  ipcMain.handle('pty:create', async (_event, sessionId: string, cwd: string, cliSessionId: string | null, isResume: boolean, extraArgs: string, providerId: ProviderId = 'claude', initialPrompt?: string, systemPrompt?: string) => {
     const win = BrowserWindow.getAllWindows()[0];
     if (!win) return;
 
@@ -97,6 +100,7 @@ export function registerIpcHandlers(): void {
       extraArgs,
       providerId,
       initialPrompt,
+      systemPrompt,
       (data) => {
         const w = BrowserWindow.getAllWindows()[0];
         if (w && !w.isDestroyed()) {
@@ -295,6 +299,23 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('provider:checkBinary', (_event, providerId: ProviderId = 'claude') => {
     const provider = getProvider(providerId);
     return provider.validatePrerequisites();
+  });
+
+  ipcMain.handle('provider:installAgent', async (_event, slug: string, content: string) => {
+    const targets = getAllProviders().filter((p) => p.installAgent && p.validatePrerequisites());
+    return Promise.all(targets.map(async (p) => {
+      try {
+        const r = await p.installAgent!(slug, content);
+        return { providerId: p.meta.id, ok: true, filePath: r.filePath };
+      } catch (err) {
+        return { providerId: p.meta.id, ok: false, error: String((err as Error)?.message ?? err) };
+      }
+    }));
+  });
+
+  ipcMain.handle('provider:removeAgent', async (_event, slug: string) => {
+    const targets = getAllProviders().filter((p) => p.removeAgent);
+    await Promise.all(targets.map((p) => p.removeAgent!(slug).catch(() => undefined)));
   });
 
   ipcMain.handle('fs:browseDirectory', async () => {
@@ -557,6 +578,23 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  ipcMain.handle('fs:trashItem', async (_event, filePath: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const resolved = path.resolve(filePath);
+      // Stricter than isAllowedReadPath: only allow trashing inside a known project,
+      // never config dirs like ~/.claude or ~/.codex.
+      if (!isWithinKnownProject(resolved)) {
+        console.warn(`fs:trashItem blocked: ${resolved} is not within a known project`);
+        return { ok: false, error: 'Path is not within a known project' };
+      }
+      await shell.trashItem(resolved);
+      return { ok: true };
+    } catch (err) {
+      console.warn('fs:trashItem failed:', err);
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
   ipcMain.on('fs:watchFile', (event, filePath: string) => {
     const resolved = path.resolve(filePath);
     if (!isAllowedReadPath(resolved)) return;
@@ -581,6 +619,15 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('readiness:analyze', (_event, projectPath: string, excludedProviders?: ProviderId[]) => analyzeReadiness(projectPath, excludedProviders));
+
+  ipcMain.handle('github:isAvailable', () => isGhAvailable());
+  ipcMain.handle('github:detectRepo', (_event, projectPath: string) => detectRepo(projectPath));
+  ipcMain.handle('github:listPRs', (_event, repo: string, state: 'open' | 'closed' | 'all', max: number) =>
+    listPullRequests(repo, { state, max })
+  );
+  ipcMain.handle('github:listIssues', (_event, repo: string, state: 'open' | 'closed' | 'all', max: number) =>
+    listIssues(repo, { state, max })
+  );
 
   ipcMain.handle('update:checkNow', () => checkForUpdates());
   ipcMain.handle('update:install', () => quitAndInstall());

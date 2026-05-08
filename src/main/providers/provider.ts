@@ -17,7 +17,7 @@ export interface CliProvider {
   resolveBinaryPath(): string;
   validatePrerequisites(): boolean;
   buildEnv(sessionId: string, baseEnv: Record<string, string>): Record<string, string>;
-  buildArgs(opts: { cliSessionId: string | null; isResume: boolean; extraArgs: string; initialPrompt?: string }): string[];
+  buildArgs(opts: { cliSessionId: string | null; isResume: boolean; extraArgs: string; initialPrompt?: string; systemPrompt?: string }): string[];
   installHooks(win?: BrowserWindow | null, projectPath?: string): Promise<void>;
   installStatusScripts(): void;
   cleanup(): void;
@@ -34,4 +34,10 @@ export interface CliProvider {
   indexTranscript?(transcriptPath: string): Promise<{ text: string; cwd: string }>;
   startConfigWatcher?(win: BrowserWindow, projectPath: string): void;
   stopConfigWatcher?(): void;
+  /** Absolute path to the user-global agents directory (e.g. ~/.claude/agents). */
+  agentsDir?(): string;
+  /** Write `<slug>.md` into the agents dir with the given markdown content. */
+  installAgent?(slug: string, content: string): Promise<{ filePath: string }>;
+  /** Remove `<slug>.md` from the agents dir. Best-effort: missing file is not an error. */
+  removeAgent?(slug: string): Promise<void>;
 }

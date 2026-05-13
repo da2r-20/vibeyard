@@ -247,7 +247,12 @@ export type OverviewWidgetType =
   | 'readiness'
   | 'provider-tools'
   | 'github-prs'
-  | 'github-issues';
+  | 'github-issues'
+  | 'team'
+  | 'kanban'
+  | 'sessions'
+  | 'favorite-sessions'
+  | 'usage-stats';
 
 export interface OverviewWidget {
   id: string;

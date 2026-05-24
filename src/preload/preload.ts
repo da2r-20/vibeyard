@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron';
-import type { CostData, ProviderId, CliProviderMeta, StatsCache, ReadinessResult, ToolFailureData, SettingsWarningData, SettingsValidationResult, StatusLineConflictData, InspectorEvent, ProviderConfig, ReadFileResult, DeepSearchResult, GithubFetchResult, GithubRepo } from '../shared/types';
+import type { CostData, ProviderId, CliProviderMeta, StatsCache, ReadinessResult, ToolFailureData, SettingsWarningData, SettingsValidationResult, StatusLineConflictData, InspectorEvent, ProviderConfig, ReadFileResult, FileStatResult, TopFilesResult, DeepSearchResult, GithubFetchResult, GithubRepo, ChromeProfile, ChromeImportOptions, ChromeImportProgress, ChromeImportResult } from '../shared/types';
 import { ZOOM_MIN, ZOOM_MAX } from '../shared/types';
 
 export type { CostData } from '../shared/types';
@@ -33,8 +33,10 @@ export interface VibeyardApi {
     listDir(dirPath: string): Promise<Array<{ name: string; path: string; isDirectory: boolean }>>;
     browseDirectory(): Promise<string | null>;
     listFiles(cwd: string, query: string): Promise<string[]>;
+    topFilesByTokens(cwd: string, limit: number): Promise<TopFilesResult>;
     exists(filePath: string): Promise<boolean>;
     readFile(filePath: string): Promise<ReadFileResult>;
+    stat(filePath: string): Promise<FileStatResult>;
     readImage(filePath: string): Promise<{ dataUrl: string } | null>;
     trashItem(filePath: string): Promise<{ ok: boolean; error?: string }>;
     watchFile(filePath: string): void;
@@ -95,6 +97,13 @@ export interface VibeyardApi {
   };
   browser: {
     saveScreenshot(sessionId: string, dataUrl: string): Promise<string>;
+  };
+  chromeImport: {
+    listProfiles(): Promise<ChromeProfile[]>;
+    run(options: ChromeImportOptions): Promise<ChromeImportResult>;
+    onProgress(callback: (progress: ChromeImportProgress) => void): () => void;
+    summary(): Promise<{ cookieCount: number; lastImportedAt: number }>;
+    clearCookies(): Promise<void>;
   };
   mcp: {
     connect(id: string, url: string): Promise<{ success: boolean; data?: unknown; error?: string }>;
@@ -209,8 +218,10 @@ const api: VibeyardApi = {
     listDir: (dirPath: string) => ipcRenderer.invoke('fs:listDir', dirPath),
     browseDirectory: () => ipcRenderer.invoke('fs:browseDirectory'),
     listFiles: (cwd: string, query: string) => ipcRenderer.invoke('fs:listFiles', cwd, query),
+    topFilesByTokens: (cwd: string, limit: number) => ipcRenderer.invoke('fs:topFilesByTokens', cwd, limit),
     exists: (filePath: string) => ipcRenderer.invoke('fs:exists', filePath),
     readFile: (filePath: string) => ipcRenderer.invoke('fs:readFile', filePath),
+    stat: (filePath: string) => ipcRenderer.invoke('fs:stat', filePath),
     readImage: (filePath: string) => ipcRenderer.invoke('fs:readImage', filePath),
     trashItem: (filePath: string) => ipcRenderer.invoke('fs:trashItem', filePath),
     watchFile: (filePath: string) => ipcRenderer.send('fs:watchFile', filePath),
@@ -271,6 +282,14 @@ const api: VibeyardApi = {
   browser: {
     saveScreenshot: (sessionId: string, dataUrl: string) =>
       ipcRenderer.invoke('browser:saveScreenshot', sessionId, dataUrl),
+  },
+  chromeImport: {
+    listProfiles: () => ipcRenderer.invoke('chromeImport:listProfiles'),
+    run: (options: ChromeImportOptions) => ipcRenderer.invoke('chromeImport:run', options),
+    onProgress: (callback) =>
+      onChannel('chromeImport:progress', (progress) => callback(progress as ChromeImportProgress)),
+    summary: () => ipcRenderer.invoke('chromeImport:summary'),
+    clearCookies: () => ipcRenderer.invoke('chromeImport:clearCookies'),
   },
   mcp: {
     connect: (id: string, url: string) => ipcRenderer.invoke('mcp:connect', id, url),

@@ -1,5 +1,5 @@
-export type { McpServer, Agent, Skill, Command, ProviderConfig, ClaudeConfig, GitWorktree, GitFileEntry, CostData, McpResult, ProviderId, CliProviderMeta, CliProviderCapabilities, StatsCache, ReadinessResult, ReadinessCategory, ReadinessCheck, ReadinessCheckStatus } from '../shared/types.js';
-import type { CostData, ProviderConfig, GitWorktree, McpResult, ProviderId, CliProviderMeta, StatsCache, ReadinessResult } from '../shared/types.js';
+export type { McpServer, Agent, Skill, Command, ProviderConfig, ClaudeConfig, GitWorktree, GitFileEntry, CostData, McpResult, ProviderId, CliProviderMeta, CliProviderCapabilities, StatsCache, ReadinessResult, ReadinessCategory, ReadinessCheck, ReadinessCheckStatus, ChromeProfile, ChromeImportOptions, ChromeImportProgress, ChromeImportResult } from '../shared/types.js';
+import type { CostData, ProviderConfig, GitWorktree, McpResult, ProviderId, CliProviderMeta, StatsCache, ReadinessResult, TopFilesResult, ChromeProfile, ChromeImportOptions, ChromeImportProgress, ChromeImportResult } from '../shared/types.js';
 
 export interface VibeyardApi {
   pty: {
@@ -25,6 +25,7 @@ export interface VibeyardApi {
     listDirs(dirPath: string, prefix?: string): Promise<string[]>;
     browseDirectory(): Promise<string | null>;
     listFiles(cwd: string, query: string): Promise<string[]>;
+    topFilesByTokens(cwd: string, limit: number): Promise<TopFilesResult>;
     exists(filePath: string): Promise<boolean>;
     readFile(filePath: string): Promise<string>;
     readImage(filePath: string): Promise<{ dataUrl: string } | null>;
@@ -68,6 +69,13 @@ export interface VibeyardApi {
     getVersion(): Promise<string>;
     openExternal(url: string): Promise<void>;
     onQuitting(callback: () => void): () => void;
+  };
+  chromeImport: {
+    listProfiles(): Promise<ChromeProfile[]>;
+    run(options: ChromeImportOptions): Promise<ChromeImportResult>;
+    onProgress(callback: (progress: ChromeImportProgress) => void): () => void;
+    summary(): Promise<{ cookieCount: number; lastImportedAt: number }>;
+    clearCookies(): Promise<void>;
   };
   mcp: {
     connect(id: string, url: string): Promise<McpResult>;

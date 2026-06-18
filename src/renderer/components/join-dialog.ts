@@ -4,8 +4,10 @@ import { joinRemoteSession } from '../sharing/share-manager.js';
 import { appState } from '../state.js';
 import { DecryptionError, validatePin } from '../sharing/share-crypto.js';
 import { createPinInput } from '../dom-utils.js';
+import { bindModalDismiss } from './modal-manager.js';
 
 let activeOverlay: HTMLElement | null = null;
+let activeDismiss: (() => void) | null = null;
 
 export function showJoinDialog(): void {
   closeJoinDialog();
@@ -70,7 +72,7 @@ export function showJoinDialog(): void {
   answerSection.appendChild(answerTextarea);
 
   const copyAnswerBtn = document.createElement('button');
-  copyAnswerBtn.className = 'share-btn share-btn-secondary';
+  copyAnswerBtn.className = 'btn-secondary share-btn';
   copyAnswerBtn.textContent = 'Copy Response';
   copyAnswerBtn.addEventListener('click', () => {
     navigator.clipboard.writeText(answerTextarea.value);
@@ -85,11 +87,11 @@ export function showJoinDialog(): void {
   actions.className = 'share-actions';
 
   const joinBtn = document.createElement('button');
-  joinBtn.className = 'share-btn';
+  joinBtn.className = 'btn-primary share-btn';
   joinBtn.textContent = 'Join';
 
   const closeBtn = document.createElement('button');
-  closeBtn.className = 'share-btn share-btn-secondary';
+  closeBtn.className = 'btn-secondary share-btn';
   closeBtn.textContent = 'Cancel';
   closeBtn.addEventListener('click', closeJoinDialog);
 
@@ -100,13 +102,9 @@ export function showJoinDialog(): void {
   overlay.appendChild(dialog);
   document.body.appendChild(overlay);
 
-  // Handle Escape
-  overlay.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (e.key === 'Escape') closeJoinDialog();
-  });
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) closeJoinDialog();
-  });
+  // ESC + overlay background click close the dialog (capture-phase ESC so it
+  // works over a focused terminal and never leaks to the PTY).
+  activeDismiss = bindModalDismiss({ overlay, onClose: closeJoinDialog });
 
   // Join flow
   joinBtn.addEventListener('click', async () => {
@@ -151,6 +149,10 @@ export function showJoinDialog(): void {
 }
 
 export function closeJoinDialog(): void {
+  if (activeDismiss) {
+    activeDismiss();
+    activeDismiss = null;
+  }
   if (activeOverlay) {
     activeOverlay.remove();
     activeOverlay = null;

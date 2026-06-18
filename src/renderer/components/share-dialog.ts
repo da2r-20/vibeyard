@@ -5,8 +5,10 @@ import { shareSession, acceptShareAnswer, endShare } from '../sharing/share-mana
 import { isSharing, isConnected } from '../sharing/peer-host.js';
 import { validatePin } from '../sharing/share-crypto.js';
 import { createPinInput } from '../dom-utils.js';
+import { bindModalDismiss } from './modal-manager.js';
 
 let activeOverlay: HTMLElement | null = null;
+let activeDismiss: (() => void) | null = null;
 let pendingShareSessionId: string | null = null;
 
 export function showShareDialog(sessionId: string): void {
@@ -100,7 +102,7 @@ export function showShareDialog(sessionId: string): void {
   offerSection.appendChild(offerTextarea);
 
   const copyOfferBtn = document.createElement('button');
-  copyOfferBtn.className = 'share-btn share-btn-secondary';
+  copyOfferBtn.className = 'btn-secondary share-btn';
   copyOfferBtn.textContent = 'Copy Code';
   copyOfferBtn.addEventListener('click', () => {
     navigator.clipboard.writeText(offerTextarea.value);
@@ -139,24 +141,24 @@ export function showShareDialog(sessionId: string): void {
   actions.className = 'share-actions';
 
   const closeBtn = document.createElement('button');
-  closeBtn.className = 'share-btn share-btn-secondary';
+  closeBtn.className = 'btn-secondary share-btn';
   closeBtn.textContent = 'Cancel';
   closeBtn.addEventListener('click', closeShareDialog);
 
   const backBtn = document.createElement('button');
-  backBtn.className = 'share-btn share-btn-secondary hidden';
+  backBtn.className = 'btn-secondary share-btn hidden';
   backBtn.textContent = 'Back';
 
   const nextBtn = document.createElement('button');
-  nextBtn.className = 'share-btn';
+  nextBtn.className = 'btn-primary share-btn';
   nextBtn.textContent = 'Next';
 
   const startBtn = document.createElement('button');
-  startBtn.className = 'share-btn hidden';
+  startBtn.className = 'btn-primary share-btn hidden';
   startBtn.textContent = 'Start Sharing';
 
   const connectBtn = document.createElement('button');
-  connectBtn.className = 'share-btn hidden';
+  connectBtn.className = 'btn-primary share-btn hidden';
   connectBtn.textContent = 'Connect';
   connectBtn.disabled = true;
 
@@ -210,14 +212,9 @@ export function showShareDialog(sessionId: string): void {
     }
   });
 
-  // ── Handle Escape ──
+  // ── Handle Escape + overlay background click (capture-phase ESC) ──
 
-  overlay.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (e.key === 'Escape') closeShareDialog();
-  });
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) closeShareDialog();
-  });
+  activeDismiss = bindModalDismiss({ overlay, onClose: closeShareDialog });
 
   // ── Start sharing flow ──
 
@@ -272,6 +269,10 @@ export function showShareDialog(sessionId: string): void {
 }
 
 export function closeShareDialog(): void {
+  if (activeDismiss) {
+    activeDismiss();
+    activeDismiss = null;
+  }
   if (activeOverlay) {
     activeOverlay.remove();
     activeOverlay = null;

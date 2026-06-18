@@ -9,6 +9,7 @@ import { restartAndResync } from './hook-status';
 import { initProviders, getAllProviders } from './providers/registry';
 import { initAutoUpdater } from './auto-updater';
 import { stopGitWatcher } from './git-watcher';
+import { stopAllFileWatchers } from './file-watcher';
 import { checkPythonAvailable } from './prerequisites';
 import { isMac } from './platform';
 import { isCloseConfirmed, setCloseConfirmed } from './close-state';
@@ -73,6 +74,7 @@ function createWindow(): void {
     killAllPtys();
     resetHookWatcher();
     resetPasteListener();
+    stopAllFileWatchers();
     mainWindow = null;
   });
 
@@ -156,6 +158,7 @@ app.on('before-quit', (event) => {
   }
   killAllPtys();
   stopGitWatcher();
+  stopAllFileWatchers();
   // Cleanup all providers
   for (const provider of getAllProviders()) {
     provider.cleanup();

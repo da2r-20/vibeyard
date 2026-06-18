@@ -1,6 +1,5 @@
 import type { VibeyardApi } from './types.js';
-import type { SessionRecord, ProjectRecord, Preferences, PersistedState, ArchivedSession, ProviderId, CostInfo, ContextWindowInfo, InitialContextSnapshot, ReadinessResult, ReadinessSnapshot, TeamMember, TeamData, OverviewLayout } from '../shared/types.js';
-import { getCost } from './session-cost.js';
+import type { SessionRecord, ProjectRecord, Preferences, PersistedState, ArchivedSession, ProviderId, CostInfo, ContextWindowInfo, InitialContextSnapshot, ReadinessResult, ReadinessSnapshot, TeamMember, TeamData, Profile, OverviewLayout } from '../shared/types.js';
 import { getProviderCapabilities, getProviderAvailabilitySnapshot } from './provider-availability.js';
 import { basename, isAbsolutePath } from '../shared/platform.js';
 import { isCliSession } from './session-utils.js';
@@ -48,6 +47,7 @@ import {
   findExistingTabByType,
   resolveCliProvider,
   resolvePlanProvider,
+  resolveProfile,
 } from './state/specialized-sessions.js';
 import {
   addInsightSnapshot as addInsightSnapshotPure,
@@ -91,6 +91,7 @@ type EventType =
   | 'cli-session-cleared'
   | 'board-changed'
   | 'team-changed'
+  | 'profiles-changed'
   | 'overview-layout-changed'
   | 'github-unread-changed'
   | 'state-loaded';
@@ -108,7 +109,7 @@ const defaultPreferences: Preferences = {
   copyOnSelect: false,
   zoomFactor: 1.0,
   readinessExcludedProviders: [],
-  sidebarViews: { gitPanel: true, sessionHistory: true, costFooter: true, discussions: true, fileTree: true },
+  sidebarViews: { gitPanel: true, sessionHistory: true, discussions: true, fileTree: true },
   boardCardMetrics: true,
 };
 
@@ -284,7 +285,7 @@ class AppState {
     this.emit('project-changed');
   }
 
-  addProject(name: string, path: string): ProjectRecord {
+  addProject(name: string, path: string, defaultProfileId?: string): ProjectRecord {
     const project: ProjectRecord = {
       id: crypto.randomUUID(),
       name,
@@ -293,6 +294,7 @@ class AppState {
       activeSessionId: null,
       layout: { mode: 'tabs', splitPanes: [], splitDirection: 'horizontal' },
       board: createDefaultBoard(),
+      defaultProfileId,
     };
     this.state.projects.push(project);
     this.state.activeProjectId = project.id;
@@ -341,14 +343,21 @@ class AppState {
     return this.addSession(projectId, name, args, providerId);
   }
 
-  addSession(projectId: string, name: string, args?: string, providerId?: ProviderId): SessionRecord | undefined {
+  addSession(projectId: string, name: string, args?: string, providerId?: ProviderId, profileId?: string, envVars?: string): SessionRecord | undefined {
     const project = this.state.projects.find((p) => p.id === projectId);
     if (!project) return undefined;
 
+    const cliProviderId = resolveCliProvider(this.state.preferences, providerId);
+    // Pin the effective profile (explicit > project default > global default,
+    // provider-matched) onto the session at creation so it stays sticky — resume
+    // must reuse the same config dir even if a default changes later.
+    const pinnedProfileId = resolveProfile({ profileId }, project, this.state.preferences, cliProviderId, this.profiles)?.id;
     const session = buildCliSession({
       name,
-      providerId: resolveCliProvider(this.state.preferences, providerId),
+      providerId: cliProviderId,
       args: args ?? project.defaultArgs,
+      profileId: pinnedProfileId,
+      envVars: envVars ?? project.defaultEnv,
     });
     attachSessionToProject(project, session, { addToSwarm: true });
     this.commitNewSession(projectId, session);
@@ -506,6 +515,77 @@ class AppState {
     this.emit('team-changed');
   }
 
+  // --- CLI provider profiles ---
+
+  get profiles(): Profile[] {
+    if (!this.state.profiles) this.state.profiles = [];
+    return this.state.profiles;
+  }
+
+  getProfile(id: string): Profile | undefined {
+    return this.profiles.find((p) => p.id === id);
+  }
+
+  /**
+   * Create a profile. Provisions its config dir in the main process first,
+   * then records the resolved absolute path. Async because provisioning is IPC.
+   */
+  async addProfile(input: { name: string; providerId: ProviderId; customPath?: string }): Promise<Profile> {
+    const id = crypto.randomUUID();
+    const { configDir, managed } = await window.vibeyard.profiles.provision(id, input.customPath);
+    const profile: Profile = {
+      id,
+      name: input.name.trim(),
+      providerId: input.providerId,
+      configDir,
+      managed,
+      createdAt: Date.now(),
+    };
+    this.profiles.push(profile);
+    this.persist();
+    this.emit('profiles-changed');
+    return profile;
+  }
+
+  updateProfile(id: string, patch: Partial<Pick<Profile, 'name'>>): Profile | undefined {
+    const profile = this.profiles.find((p) => p.id === id);
+    if (!profile) return undefined;
+    if (patch.name !== undefined) profile.name = patch.name.trim();
+    this.persist();
+    this.emit('profiles-changed');
+    return profile;
+  }
+
+  removeProfile(id: string): void {
+    const idx = this.profiles.findIndex((p) => p.id === id);
+    if (idx === -1) return;
+    this.profiles.splice(idx, 1);
+    // Don't orphan references: any session/project/preference pointing at the
+    // deleted profile falls back to the default config dir.
+    for (const project of this.state.projects) {
+      if (project.defaultProfileId === id) project.defaultProfileId = undefined;
+      for (const session of project.sessions) {
+        if (session.profileId === id) session.profileId = undefined;
+      }
+      for (const archived of project.sessionHistory ?? []) {
+        if (archived.profileId === id) archived.profileId = undefined;
+      }
+    }
+    if (this.state.preferences.defaultProfileId === id) {
+      this.state.preferences.defaultProfileId = undefined;
+    }
+    this.persist();
+    this.emit('profiles-changed');
+  }
+
+  setProjectDefaultProfile(projectId: string, profileId: string | undefined): void {
+    const project = this.state.projects.find((p) => p.id === projectId);
+    if (!project) return;
+    project.defaultProfileId = profileId || undefined;
+    this.persist();
+    this.emit('project-changed');
+  }
+
   startTeamChat(
     projectId: string,
     member: TeamMember,
@@ -580,8 +660,7 @@ class AppState {
     // Archive CLI sessions before removing (cost data must be captured before session-removed triggers destroyTerminal)
     const session = project.sessions.find((s) => s.id === sessionId);
     if (session && isCliSession(session) && this.state.preferences.sessionHistoryEnabled) {
-      // Skip archiving empty sessions (no CLI activity)
-      if (session.cliSessionId || getCost(session.id) !== null) {
+      if (this.isArchivable(session, project)) {
         this.archiveSession(project, session);
       }
     }
@@ -599,6 +678,29 @@ class AppState {
     this.persist();
     this.emit('session-removed', { projectId, sessionId });
     this.emit('session-changed');
+  }
+
+  /** Resolve the config dir backing a provider profile (for transcript lookup). */
+  private profileConfigDir(providerId: ProviderId, profileId?: string): string | undefined {
+    if (!profileId) return undefined;
+    return this.profiles.find((p) => p.id === profileId && p.providerId === providerId)?.configDir;
+  }
+
+  /**
+   * Whether a CLI session is worth keeping in history: only if its conversation
+   * transcript actually exists on disk. A cliSessionId alone is NOT enough — it is
+   * assigned at PTY spawn (SessionStart hook) before any user interaction, so a session
+   * that was never prompted has an id but no transcript and would fail to resume.
+   */
+  private isArchivable(session: SessionRecord, project: ProjectRecord): boolean {
+    if (!session.cliSessionId) return false;
+    const providerId = session.providerId ?? 'claude';
+    return window.vibeyard.session.transcriptExistsSync(
+      providerId,
+      session.cliSessionId,
+      project.path,
+      this.profileConfigDir(providerId, session.profileId),
+    );
   }
 
   private archiveSession(project: ProjectRecord, session: SessionRecord): void {
@@ -650,15 +752,45 @@ class AppState {
     return session;
   }
 
+  /**
+   * Resume from history, but first verify the transcript still exists on disk.
+   * If it's gone (a stale entry, or the user deleted the transcript), silently
+   * drop the history entry instead of spawning a session that would immediately
+   * exit and auto-close. Preferred entry point for all UI resume actions.
+   */
+  async resumeFromHistorySafe(projectId: string, archivedSessionId: string): Promise<SessionRecord | undefined> {
+    const project = this.state.projects.find((p) => p.id === projectId);
+    if (!project) return undefined;
+
+    const archived = project.sessionHistory?.find((a) => a.id === archivedSessionId);
+    if (!archived || !archived.cliSessionId) return undefined;
+
+    const exists = await window.vibeyard.session.transcriptExists(
+      archived.providerId,
+      archived.cliSessionId,
+      project.path,
+      this.profileConfigDir(archived.providerId, archived.profileId),
+    );
+    if (!exists) {
+      this.removeHistoryEntry(projectId, archivedSessionId);
+      return undefined;
+    }
+
+    return this.resumeFromHistory(projectId, archivedSessionId);
+  }
+
   /** Open a CLI session by cliSessionId, bypassing Vibeyard history. Used for cross-project deep search results. */
-  openCliSession(projectId: string, cliSessionId: string, name: string, providerId: ProviderId = 'claude'): SessionRecord | undefined {
+  openCliSession(projectId: string, cliSessionId: string, name: string, providerId: ProviderId = 'claude', profileId?: string): SessionRecord | undefined {
     const project = this.state.projects.find((p) => p.id === projectId);
     if (!project) return undefined;
 
     const existing = findCliSessionTab(project, cliSessionId);
     if (existing) return this.activateExistingSession(project, existing);
 
-    const session = buildResumedSessionFromCliId(cliSessionId, name, providerId);
+    // Pin the profile the transcript was found under (provider-matched) so resume
+    // reopens against the right config dir; ignore a stale/cross-provider id.
+    const validProfileId = profileId && this.profiles.some((p) => p.id === profileId && p.providerId === providerId) ? profileId : undefined;
+    const session = buildResumedSessionFromCliId(cliSessionId, name, providerId, validProfileId);
     attachSessionToProject(project, session, { addToSwarm: true });
     this.commitNewSession(projectId, session);
     return session;
@@ -682,11 +814,15 @@ class AppState {
     const resolved = resolveResumeSource(project, source);
     if (!resolved) return undefined;
 
+    // The source transcript lives under its profile's config dir (if any), so
+    // pass it through to locate the right .jsonl when building the handoff.
+    const sourceProfile = resolved.profileId ? this.profiles.find((p) => p.id === resolved.profileId && p.providerId === resolved.providerId) : undefined;
     const initialPrompt = await window.vibeyard.session.buildResumeWithPrompt(
       resolved.providerId,
       resolved.cliSessionId ?? null,
       project.path,
       resolved.name,
+      sourceProfile?.configDir,
     );
 
     const session: SessionRecord = {
@@ -726,9 +862,12 @@ class AppState {
     if (!session) return;
 
     // If session already had a different cliSessionId (e.g., /clear was used),
-    // archive the previous session and reset the tab name
+    // archive the previous session (only if its transcript exists) and reset the tab name.
+    // isArchivable is checked while session.cliSessionId still holds the OLD id.
     if (session.cliSessionId && session.cliSessionId !== cliSessionId) {
-      this.archiveSession(project, session);
+      if (this.isArchivable(session, project)) {
+        this.archiveSession(project, session);
+      }
       session.name = `Session ${project.sessions.length + (project.sessionHistory?.length || 0)}`;
       session.userRenamed = false;
       this.emit('cli-session-cleared', { sessionId });

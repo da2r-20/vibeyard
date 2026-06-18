@@ -11,7 +11,7 @@ import { startWatching, cleanupSessionStatus } from './hook-status';
 import { startCodexSessionWatcher, registerPendingCodexSession, unregisterCodexSession } from './codex-session-watcher';
 import { getGitStatus, getGitFiles, getGitDiff, getGitWorktrees, gitStageFile, gitUnstageFile, gitDiscardFile, getGitRemoteUrl, listGitBranches, checkoutGitBranch, createGitBranch } from './git-status';
 import { startGitWatcher, stopGitWatcher, notifyGitChanged } from './git-watcher';
-import { watchFile as watchFileForChanges, unwatchFile as unwatchFileForChanges, setFileWatcherWindow } from './file-watcher';
+import { watchDir, unwatchDir, setFileWatcherWindow } from './file-watcher';
 import { registerMcpHandlers } from './mcp-ipc-handlers';
 import { checkForUpdates, quitAndInstall } from './auto-updater';
 import { createAppMenu } from './menu';
@@ -28,7 +28,10 @@ import { isMac, isWin } from './platform';
 import { listProfiles as listChromeProfiles, runImport as runChromeImport, clearImportedCookies, getCookieCount } from './chrome-import/importer';
 import type { ChromeImportOptions, ChromeImportProgress } from '../shared/types';
 import { shouldWarnStatusLine } from './settings-guard';
+import { buildVibeyardignoreMatcher } from './vibeyardignore';
 import { setCloseConfirmed } from './close-state';
+import { provisionProfileDir } from './profiles';
+import { getKeychainIsolationStatus } from './claude-keychain';
 
 /**
  * Check if a resolved path is within one of the known project directories.
@@ -115,7 +118,7 @@ export function resetHookWatcher(): void {
 }
 
 export function registerIpcHandlers(): void {
-  ipcMain.handle('pty:create', async (_event, sessionId: string, cwd: string, cliSessionId: string | null, isResume: boolean, extraArgs: string, providerId: ProviderId = 'claude', initialPrompt?: string, systemPrompt?: string) => {
+  ipcMain.handle('pty:create', async (_event, sessionId: string, cwd: string, cliSessionId: string | null, isResume: boolean, extraArgs: string, providerId: ProviderId = 'claude', initialPrompt?: string, systemPrompt?: string, envVars: string = '', configDir?: string) => {
     const win = BrowserWindow.getAllWindows()[0];
     if (!win) return;
 
@@ -142,6 +145,7 @@ export function registerIpcHandlers(): void {
       providerId,
       initialPrompt,
       systemPrompt,
+      envVars,
       (data) => {
         const w = BrowserWindow.getAllWindows()[0];
         if (w && !w.isDestroyed()) {
@@ -156,13 +160,14 @@ export function registerIpcHandlers(): void {
         if (w && !w.isDestroyed()) {
           w.webContents.send('pty:exit', sessionId, exitCode, signal);
         }
-      }
+      },
+      configDir
     );
 
     // Validate after spawnPty — Copilot installs per-project hooks there, so
     // validating earlier would see an empty config on a project's first spawn.
     if (provider.meta.capabilities.hookStatus) {
-      const validation = provider.validateSettings(cwd);
+      const validation = provider.validateSettings(cwd, configDir);
       const prefs = loadState().preferences;
       const statusLineIssue = shouldWarnStatusLine(
         validation.statusLine,
@@ -266,6 +271,20 @@ export function registerIpcHandlers(): void {
     saveState(state);
   });
 
+  // Provision (create) a profile's config dir. Returns the resolved absolute
+  // path and whether it is the auto-managed location.
+  ipcMain.handle('profiles:provision', (_event, profileId: string, customPath?: string) => {
+    const configDir = provisionProfileDir(profileId, customPath);
+    return { configDir, managed: !customPath?.trim() };
+  });
+
+  // Report whether the installed Claude Code build can isolate per-profile
+  // logins on this platform (macOS keychain namespacing). Drives the profile
+  // guardrail in the UI.
+  ipcMain.handle('profiles:keychainStatus', () => {
+    return getKeychainIsolationStatus();
+  });
+
   ipcMain.handle('menu:rebuild', (_event, debugMode: boolean) => {
     createAppMenu(debugMode);
   });
@@ -319,18 +338,48 @@ export function registerIpcHandlers(): void {
     sourceCliSessionId: string | null,
     projectPath: string,
     sessionName: string,
+    configDir?: string,
   ) => {
     const sourceProvider = getProvider(sourceProviderId);
     const fromProviderLabel = sourceProvider.meta.displayName;
     let transcriptPath: string | null = null;
     if (sourceCliSessionId && sourceProvider.getTranscriptPath) {
       try {
-        transcriptPath = sourceProvider.getTranscriptPath(sourceCliSessionId, projectPath);
+        transcriptPath = sourceProvider.getTranscriptPath(sourceCliSessionId, projectPath, configDir);
       } catch (err) {
         console.warn('getTranscriptPath failed:', err);
       }
     }
     return buildHandoffPrompt({ fromProviderLabel, sessionName, transcriptPath });
+  });
+
+  // Whether a resumable transcript actually exists on disk for a given CLI session.
+  // Fail-open (return true) when we cannot determine it, so resume/archive is never
+  // wrongly blocked for providers we can't introspect.
+  const transcriptExists = (
+    providerId: ProviderId,
+    cliSessionId: string | null,
+    projectPath: string,
+    configDir?: string,
+  ): boolean => {
+    if (!cliSessionId) return true;
+    try {
+      const provider = getProvider(providerId);
+      if (!provider.getTranscriptPath) return true;
+      // getTranscriptPath returns null when the transcript is absent (every provider
+      // verifies existence on disk), so a non-null path means the transcript exists.
+      return provider.getTranscriptPath(cliSessionId, projectPath, configDir) !== null;
+    } catch (err) {
+      console.warn('transcriptExists check failed:', err);
+      return true;
+    }
+  };
+  ipcMain.handle('session:transcriptExists', (_event, providerId: ProviderId, cliSessionId: string | null, projectPath: string, configDir?: string) =>
+    transcriptExists(providerId, cliSessionId, projectPath, configDir));
+  // Synchronous variant: the renderer gates session archiving on this at close time,
+  // where the surrounding remove/persist/emit logic must stay synchronous.
+  ipcMain.on('session:transcriptExistsSync', (event, providerId: ProviderId, cliSessionId: string | null, projectPath: string, configDir?: string) => {
+    event.returnValue = transcriptExists(providerId, cliSessionId, projectPath, configDir);
   });
 
   ipcMain.handle('session:deepSearch', (_event, query: string) => {
@@ -579,7 +628,8 @@ export function registerIpcHandlers(): void {
         return { ok: false };
       }
       const clampedLimit = Math.max(1, Math.min(100, Math.floor(limit) || 10));
-      const relFiles = enumerateProjectFiles(resolvedCwd);
+      const isIgnored = buildVibeyardignoreMatcher(resolvedCwd);
+      const relFiles = enumerateProjectFiles(resolvedCwd).filter((rel) => !isIgnored(rel));
 
       const results: TopFile[] = [];
       let scanned = 0;
@@ -724,17 +774,17 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.on('fs:watchFile', (event, filePath: string) => {
-    const resolved = path.resolve(filePath);
+  ipcMain.on('fs:watchDir', (event, dirPath: string) => {
+    const resolved = path.resolve(dirPath);
     if (!isAllowedReadPath(resolved)) return;
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) setFileWatcherWindow(win);
-    watchFileForChanges(resolved);
+    watchDir(resolved);
   });
 
-  ipcMain.on('fs:unwatchFile', (_event, filePath: string) => {
-    const resolved = path.resolve(filePath);
-    unwatchFileForChanges(resolved);
+  ipcMain.on('fs:unwatchDir', (_event, dirPath: string) => {
+    const resolved = path.resolve(dirPath);
+    unwatchDir(resolved);
   });
 
   ipcMain.handle('stats:getCache', () => {

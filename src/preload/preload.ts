@@ -1,12 +1,12 @@
 import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron';
-import type { CostData, ProviderId, CliProviderMeta, StatsCache, ReadinessResult, ToolFailureData, SettingsWarningData, SettingsValidationResult, StatusLineConflictData, InspectorEvent, ProviderConfig, ReadFileResult, FileStatResult, TopFilesResult, DeepSearchResult, GithubFetchResult, GithubRepo, ChromeProfile, ChromeImportOptions, ChromeImportProgress, ChromeImportResult } from '../shared/types';
+import type { CostData, ProviderId, CliProviderMeta, StatsCache, ReadinessResult, ToolFailureData, SettingsWarningData, SettingsValidationResult, StatusLineConflictData, InspectorEvent, ProviderConfig, ReadFileResult, FileStatResult, TopFilesResult, FsChange, DeepSearchResult, GithubFetchResult, GithubRepo, ChromeProfile, ChromeImportOptions, ChromeImportProgress, ChromeImportResult } from '../shared/types';
 import { ZOOM_MIN, ZOOM_MAX } from '../shared/types';
 
 export type { CostData } from '../shared/types';
 
 export interface VibeyardApi {
   pty: {
-    create(sessionId: string, cwd: string, cliSessionId: string | null, isResume: boolean, extraArgs?: string, providerId?: ProviderId, initialPrompt?: string, systemPrompt?: string): Promise<void>;
+    create(sessionId: string, cwd: string, cliSessionId: string | null, isResume: boolean, extraArgs?: string, providerId?: ProviderId, initialPrompt?: string, systemPrompt?: string, envVars?: string, configDir?: string): Promise<void>;
     createShell(sessionId: string, cwd: string): Promise<void>;
     write(sessionId: string, data: string): void;
     resize(sessionId: string, cols: number, rows: number): void;
@@ -16,7 +16,9 @@ export interface VibeyardApi {
     onExit(callback: (sessionId: string, exitCode: number, signal?: number) => void): () => void;
   };
   session: {
-    buildResumeWithPrompt(sourceProviderId: ProviderId, sourceCliSessionId: string | null, projectPath: string, sessionName: string): Promise<string>;
+    buildResumeWithPrompt(sourceProviderId: ProviderId, sourceCliSessionId: string | null, projectPath: string, sessionName: string, configDir?: string): Promise<string>;
+    transcriptExists(providerId: ProviderId, cliSessionId: string | null, projectPath: string, configDir?: string): Promise<boolean>;
+    transcriptExistsSync(providerId: ProviderId, cliSessionId: string | null, projectPath: string, configDir?: string): boolean;
     deepSearch(query: string): Promise<DeepSearchResult[]>;
     onHookStatus(callback: (sessionId: string, status: 'working' | 'waiting' | 'completed' | 'input', hookName: string) => void): () => void;
     onCliSessionId(callback: (sessionId: string, cliSessionId: string) => void): () => void;
@@ -39,14 +41,18 @@ export interface VibeyardApi {
     stat(filePath: string): Promise<FileStatResult>;
     readImage(filePath: string): Promise<{ dataUrl: string } | null>;
     trashItem(filePath: string): Promise<{ ok: boolean; error?: string }>;
-    watchFile(filePath: string): void;
-    unwatchFile(filePath: string): void;
-    onFileChanged(callback: (filePath: string) => void): () => void;
+    watchDir(dirPath: string): void;
+    unwatchDir(dirPath: string): void;
+    onFsChange(callback: (changes: FsChange[]) => void): () => void;
     getDroppedFilePath(file: File): string;
   };
   store: {
     load(): Promise<unknown>;
     save(state: unknown): Promise<void>;
+  };
+  profiles: {
+    provision(profileId: string, customPath?: string): Promise<{ configDir: string; managed: boolean }>;
+    keychainStatus(): Promise<{ status: 'supported' | 'unsupported' | 'unknown'; version: string | null }>;
   };
   provider: {
     getConfig(providerId: ProviderId, projectPath: string): Promise<ProviderConfig>;
@@ -169,8 +175,8 @@ function onChannel(channel: string, callback: (...args: unknown[]) => void): () 
 
 const api: VibeyardApi = {
   pty: {
-    create: (sessionId, cwd, cliSessionId, isResume, extraArgs, providerId, initialPrompt, systemPrompt) =>
-      ipcRenderer.invoke('pty:create', sessionId, cwd, cliSessionId, isResume, extraArgs || '', providerId || 'claude', initialPrompt, systemPrompt),
+    create: (sessionId, cwd, cliSessionId, isResume, extraArgs, providerId, initialPrompt, systemPrompt, envVars, configDir) =>
+      ipcRenderer.invoke('pty:create', sessionId, cwd, cliSessionId, isResume, extraArgs || '', providerId || 'claude', initialPrompt, systemPrompt, envVars || '', configDir),
     createShell: (sessionId, cwd) =>
       ipcRenderer.invoke('pty:createShell', sessionId, cwd),
     write: (sessionId, data) =>
@@ -188,8 +194,12 @@ const api: VibeyardApi = {
         callback(sessionId as string, exitCode as number, signal as number | undefined)),
   },
   session: {
-    buildResumeWithPrompt: (sourceProviderId, sourceCliSessionId, projectPath, sessionName) =>
-      ipcRenderer.invoke('session:buildResumeWithPrompt', sourceProviderId, sourceCliSessionId, projectPath, sessionName),
+    buildResumeWithPrompt: (sourceProviderId, sourceCliSessionId, projectPath, sessionName, configDir) =>
+      ipcRenderer.invoke('session:buildResumeWithPrompt', sourceProviderId, sourceCliSessionId, projectPath, sessionName, configDir),
+    transcriptExists: (providerId, cliSessionId, projectPath, configDir) =>
+      ipcRenderer.invoke('session:transcriptExists', providerId, cliSessionId, projectPath, configDir),
+    transcriptExistsSync: (providerId, cliSessionId, projectPath, configDir) =>
+      ipcRenderer.sendSync('session:transcriptExistsSync', providerId, cliSessionId, projectPath, configDir),
     deepSearch: (query) =>
       ipcRenderer.invoke('session:deepSearch', query),
     onHookStatus: (callback) =>
@@ -224,9 +234,9 @@ const api: VibeyardApi = {
     stat: (filePath: string) => ipcRenderer.invoke('fs:stat', filePath),
     readImage: (filePath: string) => ipcRenderer.invoke('fs:readImage', filePath),
     trashItem: (filePath: string) => ipcRenderer.invoke('fs:trashItem', filePath),
-    watchFile: (filePath: string) => ipcRenderer.send('fs:watchFile', filePath),
-    unwatchFile: (filePath: string) => ipcRenderer.send('fs:unwatchFile', filePath),
-    onFileChanged: (callback: (filePath: string) => void) => onChannel('fs:fileChanged', (filePath) => callback(filePath as string)),
+    watchDir: (dirPath: string) => ipcRenderer.send('fs:watchDir', dirPath),
+    unwatchDir: (dirPath: string) => ipcRenderer.send('fs:unwatchDir', dirPath),
+    onFsChange: (callback: (changes: FsChange[]) => void) => onChannel('fs:changed', (changes) => callback(changes as FsChange[])),
     getDroppedFilePath: (file: File) => webUtils.getPathForFile(file),
   },
   provider: {
@@ -245,6 +255,10 @@ const api: VibeyardApi = {
   store: {
     load: () => ipcRenderer.invoke('store:load'),
     save: (state) => ipcRenderer.invoke('store:save', state),
+  },
+  profiles: {
+    provision: (profileId, customPath) => ipcRenderer.invoke('profiles:provision', profileId, customPath),
+    keychainStatus: () => ipcRenderer.invoke('profiles:keychainStatus'),
   },
   git: {
     getStatus: (path) => ipcRenderer.invoke('git:getStatus', path),

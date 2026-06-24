@@ -576,18 +576,18 @@ describe('touchProjectActivity()', () => {
     expect(mockSave).not.toHaveBeenCalled();
   });
 
-  it('setActiveProject stamps lastActivityAt on the activated project', () => {
+  it('does NOT stamp on setActiveProject — viewing a project is not interaction', () => {
     const p = appState.addProject('A', '/a');
     p.lastActivityAt = undefined;
     appState.setActiveProject(p.id);
-    expect(typeof p.lastActivityAt).toBe('number');
+    expect(p.lastActivityAt).toBeUndefined();
   });
 
-  it('creating a session stamps the project lastActivityAt', () => {
+  it('does NOT stamp on session creation — only a prompt/answer counts', () => {
     const p = appState.addProject('A', '/a');
     p.lastActivityAt = undefined;
     appState.addSession(p.id, 'S1');
-    expect(typeof p.lastActivityAt).toBe('number');
+    expect(p.lastActivityAt).toBeUndefined();
   });
 });
 

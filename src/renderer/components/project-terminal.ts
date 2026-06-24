@@ -285,6 +285,23 @@ function fitActiveShell(): void {
   }
 }
 
+let fitShellsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Trailing-debounced fit for resize storms (panel drag, ResizeObserver). Sending the
+ * PTY every intermediate size mid-drag desyncs the CLI's in-place redraw and leaves
+ * duplicated rows in scrollback; coalescing to one fit per settle avoids that. See
+ * `fitAllVisibleDebounced` in terminal-pane.ts for the full rationale.
+ */
+function fitShellsDebounced(delay = 100): void {
+  if (fitShellsDebounceTimer) clearTimeout(fitShellsDebounceTimer);
+  fitShellsDebounceTimer = setTimeout(() => {
+    fitShellsDebounceTimer = null;
+    fitActiveShell();
+    fitAllVisible();
+  }, delay);
+}
+
 export function toggleProjectTerminal(): void {
   const project = appState.activeProject;
   if (!project) return;
@@ -388,8 +405,7 @@ export function initProjectTerminal(): void {
       const delta = startY - ev.clientY;
       const newHeight = Math.max(80, Math.min(startHeight + delta, window.innerHeight - 150));
       panelEl.style.height = `${newHeight}px`;
-      fitActiveShell();
-      fitAllVisible();
+      fitShellsDebounced();
     };
 
     const onMouseUp = () => {
@@ -447,7 +463,7 @@ export function initProjectTerminal(): void {
   // Resize terminal when window resizes
   resizeObserver = new ResizeObserver(() => {
     if (currentProjectId && !panelEl.classList.contains('hidden')) {
-      fitActiveShell();
+      fitShellsDebounced();
     }
   });
   resizeObserver.observe(containerEl);

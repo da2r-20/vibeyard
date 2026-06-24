@@ -280,6 +280,7 @@ class AppState {
   setActiveProject(id: string | null): void {
     this.state.activeProjectId = id;
     const project = this.state.projects.find((p) => p.id === id);
+    if (project) project.lastActivityAt = Date.now();
     if (project?.activeSessionId) this.pushNav(project.activeSessionId);
     this.persist();
     this.emit('project-changed');
@@ -375,6 +376,8 @@ class AppState {
   }
 
   private commitNewSession(projectId: string, session: SessionRecord): void {
+    const project = this.state.projects.find((p) => p.id === projectId);
+    if (project) project.lastActivityAt = Date.now();
     this.pushNav(session.id);
     this.persist();
     this.emit('session-added', { projectId, session });
@@ -1032,6 +1035,19 @@ class AppState {
     setProjectReadinessPure(project, result);
     this.persist();
     this.emit('readiness-changed', projectId);
+  }
+
+  /**
+   * Bump a project's last-activity timestamp (drives the optional
+   * activity-sorted sidebar order). Persists but emits no event: the sorted
+   * order refreshes on the next natural sidebar render (project switch / session
+   * add) so projects don't reshuffle mid-keystroke while a session streams hooks.
+   */
+  touchProjectActivity(projectId: string): void {
+    const project = this.state.projects.find((p) => p.id === projectId);
+    if (!project) return;
+    project.lastActivityAt = Date.now();
+    this.persist();
   }
 
   reorderProject(fromIndex: number, toIndex: number): void {

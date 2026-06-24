@@ -119,6 +119,14 @@ async function main(): Promise<void> {
     if (!appState.hasSession(sessionId)) return;
     logDebugEvent('hookStatus', sessionId, hookName ? `${hookName}: ${status}` : status);
     setHookStatus(sessionId, status, hookName);
+    // A session starting work marks its project as recently active (for the
+    // optional activity-sorted sidebar order). Gated on the pref + 'working' so
+    // we don't serialize+persist the whole state on every PostToolUse when the
+    // feature is off (the default), where the timestamp is never read.
+    if (status === 'working' && appState.preferences.sortProjectsByActivity) {
+      const project = appState.projects.find((p) => p.sessions.some((s) => s.id === sessionId));
+      if (project) appState.touchProjectActivity(project.id);
+    }
   });
 
   window.vibeyard.session.onInspectorEvents((sessionId, events) => {
